@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#4a56b8">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
-<title>Skupni denar</title>
+<title>Finance</title>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root{--bg:#f9f8fd;--hd:#efeff2;--card:#fff;--tx:#1d1d24;--mu:#7a7a86;--bd:#e6e5ee;--ac:#4a56b8;--pl:#e1e1f7;--ex:#e8588a;--in:#19a98f;--on:#fff;color-scheme:light}
@@ -46,7 +46,7 @@ nav button{flex:1;border:0;background:none;border-radius:14px;font-size:20px;lin
 <header>
   <div class="hd"><button class="ib" id="cog" aria-label="Nastavitve">👤</button>
     <div class="mn" id="mnav" hidden><button class="ib" id="prev" aria-label="Prejšnje obdobje">«</button><button class="pill" id="mon"></button><button class="ib" id="next" aria-label="Naslednje obdobje">»</button></div>
-    <b id="ttl">Skupni denar</b><span style="width:48px"></span></div>
+    <b id="ttl">Finance</b><span style="width:48px"></span></div>
   <div class="seg" id="pf" hidden style="margin-top:8px"></div>
 </header>
 <main>
@@ -80,6 +80,11 @@ nav button{flex:1;border:0;background:none;border-radius:14px;font-size:20px;lin
   </form>
 </div>
 <div class="modal" id="vm" hidden><form id="vf"></form></div>
+<div id="lock" style="position:fixed;inset:0;z-index:30;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center">
+  <img src="icon-192.png" width="120" height="120" alt="" style="border-radius:26px"><b style="font-size:24px">Finance</b>
+  <button class="p" id="lbtn" style="padding:12px 30px;font-size:18px">🔒 Odkleni</button>
+  <div id="lerr" style="color:var(--ex);font-size:14px;max-width:320px"></div><button id="lcont" hidden>Nadaljuj brez zaklepa</button>
+</div>
 <script>
 const $=s=>$$(s)[0],$$=s=>document.querySelectorAll(s),LS=localStorage,enc=encodeURIComponent,dec=decodeURIComponent;
 const SC="https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.profile";
@@ -145,19 +150,27 @@ function loanCalc(l){
   });
   return {bal:Math.max(0,b),rata};
 }
+let lbusy=false,hideT=0;
+async function verify(){
+  if(!window.PublicKeyCredential||!(await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()))throw Object.assign(new Error("Ta naprava ne podpira potrditve s prstnim odtisom ali zaklepom zaslona."),{code:"nosup"});
+  const ch=crypto.getRandomValues(new Uint8Array(32));
+  if(!LS.cred){
+    const c=await navigator.credentials.create({publicKey:{challenge:ch,rp:{name:"Finance"},user:{id:crypto.getRandomValues(new Uint8Array(16)),name:who||"uporabnik",displayName:who||"uporabnik"},pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"required",residentKey:"discouraged"},timeout:60000}});
+    LS.cred=btoa(String.fromCharCode(...new Uint8Array(c.rawId)));
+  }else{
+    await navigator.credentials.get({publicKey:{challenge:ch,allowCredentials:[{type:"public-key",id:Uint8Array.from(atob(LS.cred),c=>c.charCodeAt(0))}],userVerification:"required",timeout:60000}});
+  }
+}
 async function unlock(){
   if(rv)return true;
-  try{
-    if(!window.PublicKeyCredential||!(await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()))throw new Error("Ta naprava ne podpira potrditve s prstnim odtisom.");
-    const ch=crypto.getRandomValues(new Uint8Array(32));
-    if(!LS.cred){
-      const c=await navigator.credentials.create({publicKey:{challenge:ch,rp:{name:"Skupni denar"},user:{id:crypto.getRandomValues(new Uint8Array(16)),name:who||"uporabnik",displayName:who||"uporabnik"},pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"required",residentKey:"discouraged"},timeout:60000}});
-      LS.cred=btoa(String.fromCharCode(...new Uint8Array(c.rawId)));
-    }else{
-      await navigator.credentials.get({publicKey:{challenge:ch,allowCredentials:[{type:"public-key",id:Uint8Array.from(atob(LS.cred),c=>c.charCodeAt(0))}],userVerification:"required",timeout:60000}});
-    }
-    rv=true;clearTimeout(rvT);rvT=setTimeout(()=>{rv=false;render()},120000);err();render();return true;
-  }catch(e){err(e.name==="NotAllowedError"?"Potrditev je bila preklicana ali ni uspela.":(e.message||"Potrditev ni uspela."));return false}
+  try{await verify();rv=true;clearTimeout(rvT);rvT=setTimeout(()=>{rv=false;render()},120000);err();render();return true}
+  catch(e){err(e.name==="NotAllowedError"?"Potrditev je bila preklicana ali ni uspela.":(e.message||"Potrditev ni uspela."));return false}
+}
+async function appUnlock(){
+  if(lbusy)return;lbusy=true;$("#lerr").textContent="";
+  try{await verify();$("#lock").hidden=true;if(tok&&sid&&!$("#view").hidden)load()}
+  catch(e){$("#lerr").textContent=e.name==="NotAllowedError"?"Tapni »Odkleni« in potrdi s prstnim odtisom ali zaklepom zaslona.":(e.message||"Potrditev ni uspela.");$("#lcont").hidden=e.code!=="nosup"}
+  lbusy=false;
 }
 function openVM(title,html,onOk,onClick,okLabel){
   $("#vf").innerHTML=`<b class="w">${title}</b>${html}<button type="button" data-x="1">Prekliči</button><button class="p" type="submit">${okLabel||"Shrani"}</button>`;$("#vm").hidden=false;
@@ -335,9 +348,14 @@ $("#file").onchange=async e=>{
     await load();$("#ip").textContent="Uvoz končan: "+R.length+" vnosov.";err();
   }catch(x){if(x.message!=="auth")err("Uvoz ni uspel: "+x.message)}
 };
-document.addEventListener("visibilitychange",()=>{if(document.hidden){rv=false}else if(tok&&sid&&!$("#view").hidden)load()});
+$("#lbtn").onclick=appUnlock;$("#lcont").onclick=()=>$("#lock").hidden=true;
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden){rv=false;hideT=Date.now()}
+  else{if(sid&&hideT&&Date.now()-hideT>30000&&$("#lock").hidden){$("#lock").hidden=false;appUnlock()}if(tok&&sid&&!$("#view").hidden)load()}
+});
 if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
 if(tok&&sid)start();else showSetup();
+if(sid)appUnlock();else $("#lock").hidden=true;
 </script>
 </body>
 </html>
