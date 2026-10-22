@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#4a56b8">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<title>Skupni denar</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root{--bg:#f9f8fd;--hd:#efeff2;--card:#fff;--tx:#1d1d24;--mu:#7a7a86;--bd:#e6e5ee;--ac:#4a56b8;--pl:#e1e1f7;--ex:#e8588a;--in:#19a98f;--on:#fff;color-scheme:light}
+@media(prefers-color-scheme:dark){:root{--bg:#14141a;--hd:#1d1d25;--card:#1f1f28;--tx:#ececf3;--mu:#9a9aa8;--bd:#2f2f3b;--ac:#8d98f0;--pl:#2d2f4d;--ex:#f06c98;--in:#37c9ae;--on:#14141a;color-scheme:dark}}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:calc(80px + env(safe-area-inset-bottom,0px))}
+header{background:var(--hd);padding:calc(8px + env(safe-area-inset-top,0px)) 14px 8px;position:sticky;top:0;z-index:5}
+.hd{display:flex;justify-content:space-between;align-items:center}.mn{display:flex;align-items:center;gap:4px}
+.pill{background:var(--pl);border:0;border-radius:20px;padding:8px 16px;font-weight:600;font-size:14px;color:var(--tx)}
+main{max-width:720px;margin:0 auto;padding:14px}
+button,input,select{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:9px 11px}
+button{cursor:pointer}.ib{border:0;background:none;font-size:22px;padding:4px 10px}
+.p{background:var(--ac);color:var(--on);border-color:var(--ac);font-weight:600}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:12px}
+h3{display:flex;justify-content:space-between;color:var(--ac);margin:16px 0 8px;font-size:18px}
+.ex{color:var(--ex)}.in{color:var(--in)}.mu,small{color:var(--mu);font-size:13px}
+.ic{width:42px;height:42px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-style:normal;font-size:20px;flex:none;color:#fff;font-weight:700}
+.r{display:flex;align-items:center;gap:12px;padding:9px 0}.r>div:nth-child(2){flex:1;min-width:0}
+.sp{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.day{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--bd);padding-top:10px;margin-top:6px}.day b:first-child{font-size:28px;font-weight:300}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;text-align:center;font-size:13px}.grid>div{cursor:pointer}.grid .ic{width:56px;height:56px;margin:2px auto;display:flex}
+.bar{height:8px;background:var(--bd);border-radius:5px;overflow:hidden}.bar i{display:block;height:100%}
+.two,.three{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}.three{grid-template-columns:repeat(3,1fr)}.two>div,.three>div{border-radius:14px;padding:10px;text-align:center;background:var(--card);border:1px solid var(--bd)}
+.ch{width:100%;height:auto;font-size:9px;fill:var(--mu)}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--hd);padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px));z-index:6}
+nav button{flex:1;border:0;background:none;border-radius:14px;font-size:20px;line-height:1.1;padding:6px 0}nav small{display:block;font-size:10px}nav .on{background:var(--pl);font-weight:700}nav .on small{color:var(--tx)}
+#fab,#eye{position:fixed;right:16px;bottom:calc(88px + env(safe-area-inset-bottom,0px));width:56px;height:56px;border-radius:16px;font-size:28px;background:var(--pl);border:0;z-index:6;padding:0}
+#eye.on{background:var(--ac);color:var(--on)}
+.plus{width:40px;height:40px;border-radius:50%;font-size:22px;padding:0;background:var(--pl);border:0;flex:none}
+.modal{position:fixed;inset:0;background:#0008;z-index:9;display:flex}.modal>form{background:var(--bg);width:100%;max-width:720px;margin:auto auto 0;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:92vh;overflow:auto}
+.modal .w{grid-column:1/-1}.modal input:not([type=checkbox]),.modal select{width:100%}.modal label{display:block}.modal button.on{background:var(--ac);color:var(--on);border-color:var(--ac)}
+.seg{display:flex;gap:6px}.seg button{flex:1}.seg .on{background:var(--ac);color:var(--on);border-color:var(--ac)}
+.setup input{width:100%;margin:4px 0 10px}#err{color:var(--ex);font-size:14px;margin-bottom:8px}
+</style>
+</head>
+<body>
+<header>
+  <div class="hd"><button class="ib" id="cog" aria-label="Nastavitve">👤</button>
+    <div class="mn" id="mnav" hidden><button class="ib" id="prev" aria-label="Prejšnje obdobje">«</button><button class="pill" id="mon"></button><button class="ib" id="next" aria-label="Naslednje obdobje">»</button></div>
+    <b id="ttl">Skupni denar</b><span style="width:48px"></span></div>
+  <div class="seg" id="pf" hidden style="margin-top:8px"></div>
+</header>
+<main>
+  <div id="err"></div>
+  <section id="setup" class="card setup">
+    <strong>Prijava in povezava</strong>
+    <p class="mu">Podatki so v Google Preglednici, ki si jo delita. Postopek nastavitve je v NAVODILA.md.</p>
+    <label class="mu">OAuth Client ID</label><input id="cid" placeholder="xxxx.apps.googleusercontent.com" autocomplete="off">
+    <label class="mu">Povezava do Google Preglednice</label><input id="sh" placeholder="https://docs.google.com/spreadsheets/d/…" autocomplete="off">
+    <button class="p" id="login" style="width:100%">Prijava z Google</button>
+    <div id="imp" hidden style="margin-top:18px"><strong>Uvoz iz 1Money</strong><p class="mu">Izberi datoteko uvoz-1money.csv (enkrat samo na enem telefonu).</p><input id="ipn" placeholder="Čigavi so ti vnosi? (npr. Katja)"><input type="file" id="file" accept=".csv,text/csv"><div id="ip" class="mu"></div>
+    <button id="rstfp" style="width:100%;margin-top:14px">Ponastavi prstni odtis</button></div>
+    <button id="back" hidden style="width:100%;margin-top:10px">Nazaj</button>
+  </section>
+  <section id="view" hidden></section>
+</main>
+<nav id="nav" hidden>
+  <button data-v="acc">👛<small>Računi</small></button><button data-v="cat">🥧<small>Kategorije</small></button><button data-v="tx">🧾<small>Transakcije</small></button>
+  <button data-v="ov">📊<small>Pregled</small></button><button data-v="sk">👥<small>Skupaj</small></button>
+</nav>
+<button id="fab" hidden aria-label="Nov vnos">+</button>
+<button id="eye" hidden aria-label="Pokaži zneske">👁</button>
+<div class="modal" id="sheet" hidden>
+  <form id="f">
+    <div class="seg w" id="seg"><button type="button" data-t="odhodek" class="on">Odhodek</button><button type="button" data-t="prihodek">Prihodek</button><button type="button" data-t="prenos">Prenos</button></div>
+    <input class="w" id="amt" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Znesek (€)" required>
+    <input id="cat" list="dc" placeholder="Kategorija" autocomplete="off"><input id="acc" list="da" placeholder="Račun" autocomplete="off"><input id="acc2" list="da" placeholder="Na račun" autocomplete="off" hidden>
+    <input id="date" type="date" required><input id="note" placeholder="Opomba" maxlength="120">
+    <datalist id="dc"></datalist><datalist id="da"></datalist>
+    <button type="button" id="cancel">Prekliči</button><button class="p" type="submit">Dodaj</button>
+  </form>
+</div>
+<div class="modal" id="vm" hidden><form id="vf"></form></div>
+<script>
+const $=s=>$$(s)[0],$$=s=>document.querySelectorAll(s),LS=localStorage,enc=encodeURIComponent,dec=decodeURIComponent;
+const SC="https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.profile";
+const MN=["januar","februar","marec","april","maj","junij","julij","avgust","september","oktober","november","december"],WD=["nedelja","ponedeljek","torek","sreda","četrtek","petek","sobota"];
+const PAL=["#4da3f5","#f5c518","#4caf50","#ef5b8a","#a56cd9","#ff9a3c","#26b5a5","#7a86e0","#e0654f","#8bc34a","#00acc1","#c2849b"],PC=["#4da3f5","#ef5b8a","#26b5a5","#ff9a3c"];
+const ACC=["Bančni račun Katja","Predplačniška Katja","Gotovina Katja","Bančni račun Rok","Predplačniška Rok","Gotovina Rok","Gotovina hidden place"];
+const SAV=["Triglav Investments","Etoro","Bitstamp","Pokojninski sklad Domel"];
+const LOANS=[{n:"Gorenjska Banka kredit",w:"Rok"},{n:"Intesa Ekosklad kredit Rok",w:"Rok"},{n:"Intesa Ekosklad kredit Katja",w:"Katja"},{n:"Meta kredit",w:""}],LN=LOANS.map(l=>l.n);
+const p2=n=>String(n).padStart(2,"0"),ym=d=>d.getFullYear()+"-"+p2(d.getMonth()+1),ymd=d=>ym(d)+"-"+p2(d.getDate()),today=()=>ymd(new Date());
+const sh=s=>`${+s.slice(8)}. ${+s.slice(5,7)}. ${s.slice(0,4)}`,db=(a,b)=>Math.round((new Date(b+"T12:00:00")-new Date(a+"T12:00:00"))/864e5),dAdd=(s,n)=>ymd(new Date(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8)+n));
+let tok=(LS.tok&&+LS.exp>Date.now())?LS.tok:null,sid=LS.sid||"",cid=LS.cid||"",who=LS.who||"",rows=[],bal={},R={a:"",b:"",lab:""},timer,rv=false,rvT,selCat="",ftype="odhodek";
+let tab=["acc","cat","tx","ov","sk"].includes(LS.tab)?LS.tab:"acc",pf=LS.pf||"",pr={k:"m",off:0};try{pr=JSON.parse(LS.pr)||pr}catch(e){}
+const fmt=n=>(Math.round(n*100)/100).toLocaleString("sl-SI",{minimumFractionDigits:2,maximumFractionDigits:2})+" €",mk=n=>rv?fmt(n):"•••• €";
+const esc=s=>{const d=document.createElement("div");d.textContent=s==null?"":String(s);return d.innerHTML};
+const err=t=>$("#err").textContent=t||"",sum=a=>a.reduce((s,x)=>s+x.amt,0),cmp=(a,b)=>a.date<b.date?-1:a.date>b.date?1:a.n-b.n;
+const col=s=>{let h=0;for(const c of s)h=(h*31+c.codePointAt(0))>>>0;return PAL[h%PAL.length]};
+const ico=s=>{const m=s.match(/\p{Extended_Pictographic}/u);return m?m[0]:(s.trim()[0]||"?").toUpperCase()};
+const aic=n=>/banč/i.test(n)?"🏦":/predpl/i.test(n)?"💳":/gotov/i.test(n)?"👛":ico(n);
+const inR=x=>x.date>=R.a&&x.date<=R.b,mr=()=>rows.filter(x=>inR(x)&&(!pf||x.by===pf)),pick=(L,t)=>L.filter(x=>x.t===t);
+const cs=t=>{const o={};pick(mr(),t).forEach(x=>o[x.cat]=(o[x.cat]||0)+x.amt);return o};
+const cats=t=>[...new Set(pick(rows,t).map(x=>x.cat))],lastV=n=>{const v=rows.filter(x=>x.t==="vrednost"&&x.acc===n).sort(cmp);return v.length?v[v.length-1].amt:0};
+const pn=by=>/rok/i.test(by)?"Rok":"Katja",al=(a,by)=>a==="Kartice"?"Bančni račun "+pn(by):a==="Gotovina"?"Gotovina "+pn(by):a;
+const savePr=()=>LS.pr=JSON.stringify(pr);
+
+function rng(){
+  const n=new Date(),k=pr.k,o=pr.off||0;let a,b,lab;
+  if(k==="w"){const d=new Date(n.getFullYear(),n.getMonth(),n.getDate()-((n.getDay()+6)%7)+7*o);a=ymd(d);b=dAdd(a,6);lab=o?sh(a)+" – "+sh(b):"Ta teden"}
+  else if(k==="m"){const d=new Date(n.getFullYear(),n.getMonth()+o,1);a=ymd(d);b=ymd(new Date(d.getFullYear(),d.getMonth()+1,0));lab=o?MN[d.getMonth()]+" "+d.getFullYear():"Ta mesec"}
+  else if(k==="y"){const y=n.getFullYear()+o;a=y+"-01-01";b=y+"-12-31";lab=o?String(y):"To leto"}
+  else if(k==="7"){b=ymd(n);a=dAdd(b,-6);lab="Zadnjih 7 dni"}
+  else{a=pr.from||ymd(n);b=pr.to||a;if(b<a)[a,b]=[b,a];lab=sh(a)+" – "+sh(b)}
+  return {a,b,lab};
+}
+async function api(path,opt={}){
+  const r=await fetch("https://sheets.googleapis.com/v4/spreadsheets/"+sid+path,{...opt,headers:{Authorization:"Bearer "+tok,"Content-Type":"application/json"}});
+  if(r.status===401){tok=null;LS.removeItem("tok");showSetup();err("Seja je potekla. Prijavi se znova.");throw new Error("auth")}
+  if(!r.ok){let m=r.status;try{m=(await r.json()).error.message}catch(e){}throw new Error(m)}
+  return r.json();
+}
+async function ensure(){
+  const m=await api("?fields=sheets.properties.title");
+  if(!(m.sheets||[]).some(s=>s.properties.title==="Vnosi"))await api(":batchUpdate",{method:"POST",body:JSON.stringify({requests:[{addSheet:{properties:{title:"Vnosi"}}}]})});
+  await api("/values/Vnosi!A1:I1?valueInputOption=RAW",{method:"PUT",body:JSON.stringify({values:[["datum","vrsta","kategorija","znesek","opomba","oseba","račun","skupno","račun2"]]})});
+}
+async function load(){
+  try{
+    const d=await api("/values/Vnosi!A2:I?valueRenderOption=UNFORMATTED_VALUE");
+    rows=(d.values||[]).map((r,i)=>{const by=String(r[5]||"");return {n:i+2,date:String(r[0]||""),t:r[1],cat:String(r[2]||""),amt:+r[3]||0,note:r[4]||"",by,acc:al(String(r[6]||""),by),acc2:al(String(r[8]||""),by)}}).filter(x=>x.t);
+    err();render();
+  }catch(e){if(e.message!=="auth")err("Napaka: "+e.message)}
+}
+const addMany=async L=>{await api("/values/Vnosi!A:I:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS",{method:"POST",body:JSON.stringify({values:L})});await load()},add=v=>addMany([v]);
+function derive(){
+  bal={};const ad=(a,v)=>{if(a)bal[a]=(bal[a]||0)+v};
+  rows.forEach(x=>{if(x.t==="odhodek")ad(x.acc,-x.amt);else if(x.t==="prihodek"||x.t==="začetno")ad(x.acc,x.amt);else if(x.t==="prenos"){ad(x.acc,-x.amt);ad(x.acc2,x.amt)}});
+}
+function loanCalc(l){
+  const sn=rows.filter(x=>x.t==="kredit"&&x.acc===l.n).sort(cmp);if(!sn.length)return {bal:null,rata:0};
+  const s=sn[sn.length-1],after=x=>x.date>s.date||(x.date===s.date&&x.n>s.n),rata=+s.note||0,w=l.w.toLowerCase();let b=s.amt;
+  rows.forEach(x=>{
+    if(w&&x.t==="prihodek"&&/plač/i.test(x.cat)&&after(x)&&((x.by||"").toLowerCase()===w||(x.acc||"").toLowerCase().endsWith(" "+w)))b-=rata;
+    if(x.t==="prenos"&&x.acc2===l.n&&after(x))b-=x.amt;
+  });
+  return {bal:Math.max(0,b),rata};
+}
+async function unlock(){
+  if(rv)return true;
+  try{
+    if(!window.PublicKeyCredential||!(await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()))throw new Error("Ta naprava ne podpira potrditve s prstnim odtisom.");
+    const ch=crypto.getRandomValues(new Uint8Array(32));
+    if(!LS.cred){
+      const c=await navigator.credentials.create({publicKey:{challenge:ch,rp:{name:"Skupni denar"},user:{id:crypto.getRandomValues(new Uint8Array(16)),name:who||"uporabnik",displayName:who||"uporabnik"},pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"required",residentKey:"discouraged"},timeout:60000}});
+      LS.cred=btoa(String.fromCharCode(...new Uint8Array(c.rawId)));
+    }else{
+      await navigator.credentials.get({publicKey:{challenge:ch,allowCredentials:[{type:"public-key",id:Uint8Array.from(atob(LS.cred),c=>c.charCodeAt(0))}],userVerification:"required",timeout:60000}});
+    }
+    rv=true;clearTimeout(rvT);rvT=setTimeout(()=>{rv=false;render()},120000);err();render();return true;
+  }catch(e){err(e.name==="NotAllowedError"?"Potrditev je bila preklicana ali ni uspela.":(e.message||"Potrditev ni uspela."));return false}
+}
+function openVM(title,html,onOk,onClick,okLabel){
+  $("#vf").innerHTML=`<b class="w">${title}</b>${html}<button type="button" data-x="1">Prekliči</button><button class="p" type="submit">${okLabel||"Shrani"}</button>`;$("#vm").hidden=false;
+  $("#vf").onclick=ev=>{if(ev.target.closest("[data-x]"))$("#vm").hidden=true;else if(onClick)onClick(ev)};
+  $("#vf").onsubmit=async ev=>{ev.preventDefault();try{await onOk(new FormData($("#vf")));$("#vm").hidden=true;err()}catch(x){if(x.message!=="auth")err(x.message)}};
+}
+function openPeriod(){
+  const O=[["w","Ta teden"],["m","Ta mesec"],["y","To leto"],["7","Zadnjih 7 dni"]];
+  openVM("Časovno obdobje",O.map(([k,l])=>`<button type="button" class="w ${pr.k===k?"on":""}" data-k="${k}">${l}</button>`).join("")+`<b class="w" style="margin-top:6px">Po meri</b><label class="mu">Od<input name="od" type="date" value="${R.a}"></label><label class="mu">Do<input name="do" type="date" value="${R.b}"></label>`,
+    async f=>{const a=f.get("od"),b=f.get("do");if(!a||!b)throw new Error("Izberi obe datumski polji.");pr={k:"c",from:a,to:b,off:0};savePr();render()},
+    ev=>{const b=ev.target.closest("[data-k]");if(b){pr={k:b.dataset.k,off:0};savePr();$("#vm").hidden=true;render()}},"Uporabi po meri");
+}
+function editSav(i){
+  const n=SAV[i],v=lastV(n);
+  openVM(esc(n),`<label class="w mu">Novo stanje (€)<input name="v" type="number" step="0.01" inputmode="decimal" value="${v||""}" required></label><label class="w mu">Datum<input name="d" type="date" value="${today()}" required></label>`,
+    async f=>{await add([f.get("d"),"vrednost","",parseFloat(f.get("v")),"",who,n,"",""])});
+}
+function editLoans(){
+  const L=LOANS.map(l=>({...l,...loanCalc(l)}));
+  openVM("Prilagodi kredite",L.map((l,i)=>`<b class="w">${esc(l.n)}</b><label class="mu">Preostali dolg (€)<input name="b${i}" type="number" step="0.01" inputmode="decimal" value="${l.bal==null?"":l.bal.toFixed(2)}"></label><label class="mu">Mesečna rata (€)<input name="r${i}" type="number" step="0.01" inputmode="decimal" value="${l.rata||""}"></label>`).join(""),
+    async f=>{const out=[];L.forEach((l,i)=>{const b=parseFloat(f.get("b"+i)),r=parseFloat(f.get("r"+i))||0;if(isNaN(b))return;if(l.bal==null||Math.abs(b-l.bal)>=.005||r!==l.rata)out.push([today(),"kredit","",b,r,who,l.n,"",""])});if(out.length)await addMany(out)});
+}
+function openAdd(o={}){
+  $("#sheet").hidden=false;$("#date").value=today();$("#amt").value="";$("#note").value="";$("#acc2").value="";
+  $("#acc").value=LS.acc||ACC.find(a=>a.toLowerCase().endsWith(" "+(who||"?").toLowerCase()))||ACC[0];setT(o.t||"odhodek");$("#cat").value=o.cat||"";
+}
+function rowH(x,dl){
+  const tr=x.t==="prenos",c=x.t==="prihodek"?"in":tr?"mu":"ex";
+  return `<div class="r"><i class="ic" style="background:${tr?"#8a8fa8":col(x.cat)}">${tr?"⇄":esc(ico(x.cat))}</i><div><div>${tr?"Prenos":esc(x.cat)}</div><small>${esc(tr?x.acc+" → "+x.acc2:x.acc)}${x.by&&x.by!=="Uvoz"?" · "+esc(x.by):""}</small>${x.note?`<div><small><i>${esc(x.note)}</i></small></div>`:""}</div><div style="text-align:right"><span class="${c}">${fmt(x.amt)}</span>${dl?`<br><button class="ib" style="font-size:13px;padding:0" data-n="${x.n}" aria-label="Izbriši">✕</button>`:""}</div></div>`;
+}
+
+function vAcc(){
+  const ex=Object.keys(bal).filter(n=>!ACC.includes(n)&&!SAV.includes(n)&&!LN.includes(n)&&Math.abs(bal[n])>=.005),A=[...ACC,...ex],lc=LOANS.map(l=>({n:l.n,...loanCalc(l)}));
+  const row=(ic,n,v,c,sub,btn)=>`<div class="r"><i class="ic" style="background:${col(n)}">${ic}</i><div><div>${esc(n)}</div><b class="${c}">${v==null?"—":mk(v)}</b>${sub||""}</div>${btn||""}</div>`;
+  return `<h3><span>Računi</span><b>${mk(sum(A.map(n=>({amt:bal[n]||0}))))}</b></h3>`+A.map(n=>row(aic(n),n,bal[n]||0,(bal[n]||0)<0?"ex":"in")).join("")+
+  `<h3><span>Prihranki in investicije</span><b>${mk(sum(SAV.map(n=>({amt:lastV(n)}))))}</b></h3>`+SAV.map((n,i)=>row("📈",n,lastV(n),"in","",`<button class="plus" data-sv="${i}" aria-label="Popravi stanje">+</button>`)).join("")+
+  `<h3><span>Krediti</span><b class="ex">${mk(sum(lc.map(l=>({amt:l.bal||0}))))}</b></h3>`+lc.map(l=>row("📉",l.n,l.bal,"ex",l.rata?`<div><small>rata ${mk(l.rata)}</small></div>`:"")).join("")+
+  `<button class="p" data-ln="1" style="width:100%;margin-top:10px">Prilagodi</button>`;
+}
+function vCat(){
+  const e=cs("odhodek"),inc=sum(pick(mr(),"prihodek")),T=sum(Object.values(e).map(v=>({amt:v}))),C=2*Math.PI*70,sv=selCat&&e[selCat]!=null;let off=0,arcs="";
+  Object.entries(e).sort((a,b)=>b[1]-a[1]).forEach(([n,v])=>{const l=v/T*C,s=sv&&selCat===n;arcs+=`<circle data-seg="${enc(n)}" cx="100" cy="100" r="70" fill="none" stroke="${col(n)}" stroke-width="${s?27:20}" opacity="${sv&&!s?.35:1}" stroke-dasharray="${l} ${C-l}" stroke-dashoffset="${-off}" transform="rotate(-90 100 100)" style="cursor:pointer"/>`;off+=l});
+  const tx=(y,t,st)=>`<text x="100" y="${y}" text-anchor="middle" style="pointer-events:none;${st}">${t}</text>`;
+  const mid=sv?tx(88,esc(selCat.length>18?selCat.slice(0,17)+"…":selCat),"fill:var(--tx);font-size:12px")+tx(110,fmt(e[selCat]),"fill:var(--ex);font-size:17px;font-weight:600")+tx(128,Math.round(e[selCat]/T*100)+" % vseh stroškov","fill:var(--mu);font-size:11px"):tx(92,"Stroški","fill:var(--tx);font-size:13px")+tx(112,fmt(T),"fill:var(--ex);font-size:17px;font-weight:600")+tx(130,fmt(inc),"fill:var(--in);font-size:12px");
+  const all=cats("odhodek").sort((a,b)=>(e[b]||0)-(e[a]||0)||a.localeCompare(b));
+  return `<div class="card"><svg viewBox="0 0 200 200" style="width:100%;max-width:250px;display:block;margin:auto"><circle cx="100" cy="100" r="70" fill="none" stroke="var(--bd)" stroke-width="20"/>${arcs}<circle data-cx="1" cx="100" cy="100" r="52" fill="transparent"/>${mid}</svg><p class="mu" style="text-align:center;margin:4px 0 0">Tapni barvo za podrobnosti, kategorijo spodaj za nov odhodek.</p></div><div class="grid">${all.map(n=>`<div data-cat="${enc(n)}"><div>${esc(n)}</div><i class="ic" style="background:${col(n)}">${esc(ico(n))}</i><b>${fmt(e[n]||0)}</b></div>`).join("")}</div>`;
+}
+function vTx(){
+  const L=mr().filter(x=>["odhodek","prihodek","prenos"].includes(x.t)).sort((a,b)=>cmp(b,a));
+  if(!L.length)return'<p class="mu">V tem obdobju ni vnosov.</p>';
+  const g={};L.forEach(x=>(g[x.date]=g[x.date]||[]).push(x));
+  return Object.keys(g).map(d=>`<div class="day"><span><b>${d.slice(8)}</b> <small>${WD[new Date(d+"T12:00:00").getDay()]} ${+d.slice(5,7)}. ${d.slice(0,4)}</small></span><b class="ex" style="font-size:18px">${fmt(sum(pick(g[d],"odhodek")))}</b></div>`+g[d].map(x=>rowH(x,1)).join("")).join("");
+}
+function chartBars(){
+  const span=db(R.a,R.b)+1,mo=span>62,keys=[];
+  if(mo){for(let d=new Date(+R.a.slice(0,4),+R.a.slice(5,7)-1,1);ym(d)<=R.b.slice(0,7);d.setMonth(d.getMonth()+1))keys.push(ym(d))}else for(let i=0;i<span;i++)keys.push(dAdd(R.a,i));
+  const idx={};keys.forEach((k,i)=>idx[k]=i);const cl=keys.map(()=>({}));
+  pick(mr(),"odhodek").forEach(x=>{const i=idx[mo?x.date.slice(0,7):x.date];if(i!=null)cl[i][x.cat]=(cl[i][x.cat]||0)+x.amt});
+  const mx=Math.max(1,...cl.map(o=>Object.values(o).reduce((a,b)=>a+b,0))),W=300/keys.length,lb=k=>mo?k.slice(5)+"/"+k.slice(2,4):(+k.slice(8))+"."+(+k.slice(5,7))+".";let s="";
+  cl.forEach((o,i)=>{let yb=108;Object.entries(o).forEach(([c,v])=>{const h=v/mx*95;yb-=h;s+=`<rect x="${i*W+.5}" y="${yb}" width="${Math.max(.8,W-1)}" height="${h}" fill="${col(c)}"/>`})});
+  return `<svg viewBox="0 0 300 125" class="ch">${s}<text x="0" y="121">${lb(keys[0])}</text><text x="300" y="121" text-anchor="end">${lb(keys[keys.length-1])}</text><text x="300" y="9" text-anchor="end">${Math.round(mx)} €</text></svg>`;
+}
+function chart12(){
+  const e=R.b<today()?R.b:today(),y=+e.slice(0,4),m=+e.slice(5,7),ms=[];for(let k=11;k>=0;k--)ms.push(ym(new Date(y,m-1-k,1)));
+  const E={},I={};rows.filter(x=>!pf||x.by===pf).forEach(x=>{const k=x.date.slice(0,7);if(x.t==="odhodek")E[k]=(E[k]||0)+x.amt;else if(x.t==="prihodek")I[k]=(I[k]||0)+x.amt});
+  const mx=Math.max(1,...ms.map(k=>Math.max(E[k]||0,I[k]||0))),W=25;let s="";
+  ms.forEach((k,i)=>{const a=(E[k]||0)/mx*95,b=(I[k]||0)/mx*95;s+=`<rect x="${i*W+2}" y="${108-a}" width="10" height="${a}" fill="var(--ex)"/><rect x="${i*W+12}" y="${108-b}" width="10" height="${b}" fill="var(--in)"/><text x="${i*W+12}" y="121" text-anchor="middle">${+k.slice(5)}</text>`});
+  return {svg:`<svg viewBox="0 0 300 125" class="ch">${s}</svg>`,avg:ms.reduce((a,k)=>a+(E[k]||0),0)/12,avgI:ms.reduce((a,k)=>a+(I[k]||0),0)/12};
+}
+function chartSav(){
+  const V=rows.filter(x=>x.t==="vrednost"&&SAV.includes(x.acc)).sort(cmp);
+  if(!V.length)return'<p class="mu">Stanja prihrankov še niso vnesena (zavihek Računi, gumb +).</p>';
+  const ds=[...new Set(V.map(x=>x.date))],cur={},pts=ds.map(d=>{V.filter(x=>x.date===d).forEach(x=>cur[x.acc]=x.amt);return {d,v:{...cur},t:Object.values(cur).reduce((a,b)=>a+b,0)}});
+  const T=d=>new Date(d+"T12:00:00").getTime(),t0=T(ds[0]),sp=Math.max(1,Math.max(Date.now(),T(ds[ds.length-1]))-t0),mx=Math.max(1,...pts.map(p=>p.t)),X=d=>10+(T(d)-t0)/sp*280,Y=v=>108-v/mx*95;
+  const line=(f,c,w)=>{const a=pts.filter(p=>f(p)!=null).map(p=>[X(p.d),Y(f(p))]);if(!a.length)return"";a.push([290,a[a.length-1][1]]);return `<polyline points="${a.map(q=>q.join(",")).join(" ")}" fill="none" stroke="${c}" stroke-width="${w}"/>`};
+  return `<svg viewBox="0 0 300 125" class="ch">${SAV.map((n,i)=>line(p=>p.v[n],PC[i],1.2)).join("")}${line(p=>p.t,"var(--tx)",2.2)}<text x="10" y="121">${sh(ds[0])}</text><text x="290" y="121" text-anchor="end">danes</text><text x="298" y="9" text-anchor="end">${mk(mx)}</text></svg>
+<div style="display:flex;flex-wrap:wrap;gap:4px 12px"><small><b>━</b> skupaj ${mk(sum(SAV.map(n=>({amt:lastV(n)}))))}</small>${SAV.map((n,i)=>`<small><b style="color:${PC[i]}">■</b> ${esc(n)} ${mk(lastV(n))}</small>`).join("")}</div>${rv?"":'<small>Zneski so skriti. Odkleni jih v zavihku Računi (👁).</small>'}`;
+}
+function vOv(){
+  const m=mr(),ex=sum(pick(m,"odhodek")),inc=sum(pick(m,"prihodek")),e=cs("odhodek"),n=db(R.a,R.b)+1,td=today(),dn=Math.max(1,Math.min(n,td<R.a?0:db(R.a,td)+1));
+  const wk=dAdd(td,-6),ex1=pick(rows,"odhodek").filter(x=>!pf||x.by===pf),c12=chart12();
+  return `<div style="text-align:center"><small>Stanje</small><div style="font-size:26px" class="${inc-ex<0?"ex":"in"}">${fmt(inc-ex)}</div></div>
+<div class="two"><div style="background:var(--ex);color:#fff"><small style="color:#fff">Stroški</small><div style="font-size:22px">${fmt(ex)}</div></div><div><small>Dohodki</small><div class="in" style="font-size:22px">${fmt(inc)}</div></div></div>
+<div class="card">${chartBars()}</div>
+<div class="three"><div><small>Dan (povp.)</small><div class="ex">${fmt(ex/dn)}</div></div><div><small>Danes</small><div>${fmt(sum(ex1.filter(x=>x.date===td)))}</div></div><div><small>Zadnjih 7 dni</small><div>${fmt(sum(ex1.filter(x=>x.date>=wk&&x.date<=td)))}</div></div></div>
+${Object.entries(e).sort((a,b)=>b[1]-a[1]).map(([c,v])=>`<div class="r"><i class="ic" style="background:${col(c)}">${esc(ico(c))}</i><div><div class="sp"><span>${esc(c)}</span><b>${fmt(v)}</b></div><div class="bar" style="margin-top:6px"><i style="width:${v/ex*100}%;background:${col(c)}"></i></div><small>${Math.round(v/ex*100)} %</small></div></div>`).join("")}
+<h3><span>Zadnjih 12 mesecev</span></h3><div class="card">${c12.svg}<div class="sp"><small><b class="ex">■</b> stroški (povp. ${fmt(c12.avg)})</small><small><b class="in">■</b> dohodki (povp. ${fmt(c12.avgI)})</small></div></div>
+<label class="card sp" style="align-items:center"><span>Prikaži prihranke na grafu</span><input type="checkbox" data-sav ${LS.sav?"checked":""}></label>${LS.sav?`<div class="card"><b>Prihranki in investicije</b>${chartSav()}</div>`:""}`;
+}
+function people(){const c={};rows.forEach(x=>{if(x.by&&x.by!=="Uvoz")c[x.by]=(c[x.by]||0)+1});if(who&&!c[who])c[who]=0;return Object.keys(c).sort((a,b)=>a===who?-1:b===who?1:c[b]-c[a])}
+function vSk(){
+  const Rr=rows.filter(inR),E=pick(Rr,"odhodek"),I=pick(Rr,"prihodek"),P=[...new Set([...people(),...Rr.filter(x=>x.t==="odhodek"||x.t==="prihodek").map(x=>x.by)])],pc=p=>PC[P.indexOf(p)%4],cm={};
+  E.forEach(x=>{const o=cm[x.cat]=cm[x.cat]||{};o[x.by]=(o[x.by]||0)+x.amt});
+  const tt=c=>Object.values(cm[c]).reduce((a,b)=>a+b,0),T=sum(E),cl=Object.keys(cm).sort((a,b)=>tt(b)-tt(a));
+  return `<div class="card"><small>Skupaj stroški (${esc(R.lab)})</small><div style="font-size:26px" class="ex">${fmt(T)}</div><small>Dohodki: ${fmt(sum(I))}</small>
+${P.map(p=>`<div class="sp" style="margin-top:8px"><span><b style="color:${pc(p)}">■</b> ${esc(p||"?")}</span><span><b class="ex">${fmt(sum(E.filter(x=>x.by===p)))}</b> <small>dohodki ${fmt(sum(I.filter(x=>x.by===p)))}</small></span></div>`).join("")}</div>
+${cl.map(c=>`<div class="r"><i class="ic" style="background:${col(c)}">${esc(ico(c))}</i><div><div class="sp"><span>${esc(c)}</span><b>${fmt(tt(c))}</b></div><div class="bar" style="margin:6px 0;display:flex">${P.map(p=>`<i style="width:${(cm[c][p]||0)/T*100}%;background:${pc(p)}"></i>`).join("")}</div><small>${P.filter(p=>cm[c][p]).map(p=>esc(p||"?")+" "+fmt(cm[c][p])).join(" · ")}</small></div></div>`).join("")||'<p class="mu">V tem obdobju ni vnosov.</p>'}`;
+}
+const V={acc:vAcc,cat:vCat,tx:vTx,ov:vOv,sk:vSk};
+function render(){
+  if(!tok||$("#view").hidden)return;derive();R=rng();
+  $("#mon").textContent=R.lab;$("#mnav").hidden=tab==="acc";$("#ttl").hidden=tab!=="acc";$("#prev").hidden=$("#next").hidden=pr.k==="7"||pr.k==="c";
+  const PP=people();$("#pf").hidden=tab==="acc"||tab==="sk"||PP.length<2;$("#pf").innerHTML=["",...PP].map(p=>`<button type="button" data-f="${esc(p)}" class="${pf===p?"on":""}">${p?esc(p):"Vsi"}</button>`).join("");
+  $("#fab").hidden=tab==="acc";$("#eye").hidden=tab!=="acc";$("#eye").classList.toggle("on",rv);
+  $("#view").innerHTML=V[tab]();$$("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.v===tab));
+}
+function lists(){
+  $("#da").innerHTML=[...ACC,...(ftype==="prenos"?[...LN,...SAV]:[])].map(a=>`<option value="${esc(a)}">`).join("");
+  $("#dc").innerHTML=(ftype==="prenos"?[]:cats(ftype)).map(a=>`<option value="${esc(a)}">`).join("");
+}
+function setT(t){
+  ftype=t;$$("#seg button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));
+  $("#cat").hidden=t==="prenos";$("#acc2").hidden=t!=="prenos";$("#acc").placeholder=t==="prenos"?"Iz računa":"Račun";$("#acc2").placeholder="Na račun ali kredit";lists();
+}
+function showSetup(){$("#setup").hidden=false;$("#view").hidden=true;$("#nav").hidden=true;$("#fab").hidden=true;$("#eye").hidden=true;$("#mnav").hidden=true;$("#pf").hidden=true;$("#ttl").hidden=false;$("#cid").value=cid;$("#sh").value=sid;$("#imp").hidden=!tok;$("#ipn").value=who;$("#back").hidden=!tok;clearInterval(timer)}
+function start(){$("#setup").hidden=true;$("#view").hidden=false;$("#nav").hidden=false;err();load();clearInterval(timer);timer=setInterval(load,30000)}
+function parseCSV(t,d=","){const r=[];let row=[],f="",q=false;for(let i=0;i<t.length;i++){const c=t[i];if(q){if(c=='"'){if(t[i+1]=='"'){f+='"';i++}else q=false}else f+=c}else if(c=='"')q=true;else if(c==d){row.push(f);f=""}else if(c=="\n"||c=="\r"){if(c=="\r"&&t[i+1]=="\n")i++;row.push(f);r.push(row);row=[];f=""}else f+=c}if(f||row.length){row.push(f);r.push(row)}return r}
+
+$("#login").onclick=()=>{
+  cid=$("#cid").value.trim();const m=$("#sh").value.match(/[-\w]{25,}/);sid=m?m[0]:"";
+  if(!cid||!sid)return err("Vnesi Client ID in povezavo do preglednice.");
+  if(!window.google)return err("Google prijava se še nalaga ali ni dosegljiva. Preveri internet in poskusi znova.");
+  LS.cid=cid;LS.sid=sid;
+  google.accounts.oauth2.initTokenClient({client_id:cid,scope:SC,callback:onTok,error_callback:e=>err("Prijava ni uspela ("+(e.type||"napaka")+").")}).requestAccessToken();
+};
+async function onTok(r){
+  if(r.error)return err("Prijava ni uspela: "+r.error);
+  tok=r.access_token;LS.tok=tok;LS.exp=Date.now()+(r.expires_in-60)*1000;
+  try{const u=await(await fetch("https://www.googleapis.com/oauth2/v3/userinfo",{headers:{Authorization:"Bearer "+tok}})).json();who=u.given_name||u.name||"Jaz";LS.who=who;await ensure();start()}
+  catch(e){if(e.message!=="auth")err("Napaka: "+e.message)}
+}
+$("#pf").onclick=e=>{const b=e.target.closest("[data-f]");if(!b)return;pf=b.dataset.f;LS.pf=pf;render()};
+$("#cog").onclick=showSetup;$("#back").onclick=start;$("#rstfp").onclick=()=>{LS.removeItem("cred");err("Prstni odtis ponastavljen. Ob naslednjem odklepu ga nastaviš znova.")};
+$("#mon").onclick=openPeriod;
+$("#prev").onclick=()=>{pr.off=(pr.off||0)-1;savePr();render()};
+$("#next").onclick=()=>{if((pr.off||0)<0){pr.off++;savePr();render()}};
+$("#nav").onclick=e=>{const b=e.target.closest("button");if(!b)return;tab=b.dataset.v;LS.tab=tab;render();scrollTo(0,0)};
+$("#fab").onclick=()=>openAdd();
+$("#eye").onclick=()=>{if(rv){rv=false;render()}else unlock()};
+$("#cancel").onclick=()=>$("#sheet").hidden=true;
+$("#seg").onclick=e=>{const b=e.target.closest("button");if(b)setT(b.dataset.t)};
+$("#f").onsubmit=async e=>{
+  e.preventDefault();const a=parseFloat($("#amt").value),t=ftype,c=$("#cat").value.trim(),ac=$("#acc").value.trim(),a2=$("#acc2").value.trim();
+  if(!(a>0))return;if(!ac||(t==="prenos"?!a2:!c))return err("Izpolni kategorijo in račun.");
+  try{await add([$("#date").value,t,t==="prenos"?"":c,a,$("#note").value.trim(),who,ac,"",t==="prenos"?a2:""]);LS.acc=ac;$("#sheet").hidden=true;err()}
+  catch(x){if(x.message!=="auth")err("Shranjevanje ni uspelo: "+x.message)}
+};
+$("#view").onclick=async e=>{
+  const t=e.target,d=t.closest("[data-n]"),sv=t.closest("[data-sv]"),ln=t.closest("[data-ln]"),sg=t.closest("[data-seg]"),ct=t.closest("[data-cat]");
+  try{
+    if(d){if(confirm("Izbrišem ta vnos?")){await api("/values/Vnosi!A"+d.dataset.n+":I"+d.dataset.n+":clear",{method:"POST",body:"{}"});await load()}}
+    else if(sv){if(await unlock())editSav(+sv.dataset.sv)}
+    else if(ln){if(await unlock())editLoans()}
+    else if(sg){const n=dec(sg.dataset.seg);selCat=selCat===n?"":n;render()}
+    else if(ct)openAdd({cat:dec(ct.dataset.cat)});
+    else if(t.closest("[data-cx]")){selCat="";render()}
+  }catch(x){if(x.message!=="auth")err("Napaka: "+x.message)}
+};
+$("#view").onchange=e=>{if(e.target.dataset.sav!==undefined){LS.sav=e.target.checked?"1":"";render()}};
+$("#file").onchange=async e=>{
+  const f=e.target.files[0],nm=$("#ipn").value.trim();if(!f)return;
+  if(!nm){e.target.value="";return err("Vpiši, čigavi so uvoženi vnosi.")}
+  let txt="";try{txt=(await f.text()).replace(/^\uFEFF/,"")}catch(x){e.target.value="";return err("Datoteke ni mogoče prebrati: "+x.message)}
+  e.target.value="";const h=txt.split("\n")[0],d=(h.match(/;/g)||[]).length>(h.match(/,/g)||[]).length?";":",";
+  const R=parseCSV(txt,d).filter(r=>r.length>=7);
+  if(!R.length||String(R[0][0]).trim().toLowerCase()!=="datum")return err("Datoteka nima pričakovane oblike. Prebrano ("+f.name+", "+txt.length+" znakov): "+JSON.stringify(txt.slice(0,40)));
+  R.shift();
+  if(rows.some(x=>x.t==="začetno")&&!confirm("Uvoz je že narejen. Uvozim znova (vnosi bodo podvojeni)?"))return;
+  try{
+    for(let i=0;i<R.length;i+=400){
+      const ch=R.slice(i,i+400).map(r=>{while(r.length<9)r.push("");r[3]=+r[3];r[5]=nm;return r.slice(0,9)});
+      await api("/values/Vnosi!A:I:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS",{method:"POST",body:JSON.stringify({values:ch})});
+      $("#ip").textContent="Uvoženih "+Math.min(i+400,R.length)+" od "+R.length;
+    }
+    await load();$("#ip").textContent="Uvoz končan: "+R.length+" vnosov.";err();
+  }catch(x){if(x.message!=="auth")err("Uvoz ni uspel: "+x.message)}
+};
+document.addEventListener("visibilitychange",()=>{if(document.hidden){rv=false}else if(tok&&sid&&!$("#view").hidden)load()});
+if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+if(tok&&sid)start();else showSetup();
+</script>
+</body>
+</html>
