@@ -38,7 +38,7 @@ nav button{flex:1;border:0;background:none;border-radius:14px;font-size:20px;lin
 .plus{width:40px;height:40px;border-radius:50%;font-size:22px;padding:0;background:var(--pl);border:0;flex:none}
 .modal{position:fixed;inset:0;background:#0008;z-index:9;display:flex}.modal>form{background:var(--bg);width:100%;max-width:720px;margin:auto auto 0;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:92vh;overflow:auto}
 .modal .w{grid-column:1/-1}.modal input:not([type=checkbox]),.modal select{width:100%}.modal label{display:block}.modal button.on{background:var(--ac);color:var(--on);border-color:var(--ac)}
-.seg{display:flex;gap:6px}.seg button{flex:1}.seg .on{background:var(--ac);color:var(--on);border-color:var(--ac)}
+#seg button{padding:9px 2px;font-size:14px}.seg{display:flex;gap:6px}.seg button{flex:1}.seg .on{background:var(--ac);color:var(--on);border-color:var(--ac)}
 .setup input{width:100%;margin:4px 0 10px}#err{color:var(--ex);font-size:14px;margin-bottom:8px}
 </style>
 </head>
@@ -57,9 +57,11 @@ nav button{flex:1;border:0;background:none;border-radius:14px;font-size:20px;lin
     <label class="mu">OAuth Client ID</label><input id="cid" placeholder="xxxx.apps.googleusercontent.com" autocomplete="off">
     <label class="mu">Povezava do Google Preglednice</label><input id="sh" placeholder="https://docs.google.com/spreadsheets/d/…" autocomplete="off">
     <button class="p" id="login" style="width:100%">Prijava z Google</button>
+    <p class="mu" style="text-align:center;margin:12px 0 0"><a href="zasebnost.html">Zasebnost / Privacy policy</a></p>
     <div id="imp" hidden style="margin-top:18px"><strong>Uvoz iz 1Money</strong><p class="mu">Izberi datoteko uvoz-1money.csv (enkrat samo na enem telefonu).</p><input id="ipn" placeholder="Čigavi so ti vnosi? (npr. Katja)"><input type="file" id="file" accept=".csv,text/csv"><div id="ip" class="mu"></div>
     <button id="rstfp" style="width:100%;margin-top:14px">Ponastavi prstni odtis</button></div>
     <button id="back" hidden style="width:100%;margin-top:10px">Nazaj</button>
+    <button id="logout" hidden style="width:100%;margin-top:10px">Odjava</button>
   </section>
   <section id="view" hidden></section>
 </main>
@@ -71,7 +73,7 @@ nav button{flex:1;border:0;background:none;border-radius:14px;font-size:20px;lin
 <button id="eye" hidden aria-label="Pokaži zneske">👁</button>
 <div class="modal" id="sheet" hidden>
   <form id="f">
-    <div class="seg w" id="seg"><button type="button" data-t="odhodek" class="on">Odhodek</button><button type="button" data-t="prihodek">Prihodek</button><button type="button" data-t="prenos">Prenos</button></div>
+    <div class="seg w" id="seg"><button type="button" data-t="odhodek" class="on">Odhodek</button><button type="button" data-t="prihodek">Prihodek</button><button type="button" data-t="prenos">Prenos</button><button type="button" data-t="povračilo">Povračilo</button></div>
     <input class="w" id="amt" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Znesek (€)" required>
     <input id="cat" list="dc" placeholder="Kategorija" autocomplete="off"><input id="acc" list="da" placeholder="Račun" autocomplete="off"><input id="acc2" list="da" placeholder="Na račun" autocomplete="off" hidden>
     <input id="date" type="date" required><input id="note" placeholder="Opomba" maxlength="120">
@@ -108,6 +110,13 @@ const cs=t=>{const o={};pick(mr(),t).forEach(x=>o[x.cat]=(o[x.cat]||0)+x.amt);re
 const cats=t=>[...new Set(pick(rows,t).map(x=>x.cat))],lastV=n=>{const v=rows.filter(x=>x.t==="vrednost"&&x.acc===n).sort(cmp);return v.length?v[v.length-1].amt:0};
 const pn=by=>/rok/i.test(by)?"Rok":"Katja",al=(a,by)=>a==="Kartice"?"Bančni račun "+pn(by):a==="Gotovina"?"Gotovina "+pn(by):a;
 const savePr=()=>LS.pr=JSON.stringify(pr);
+const cfg=()=>sid&&who&&!LS.out,tokOk=()=>tok&&+LS.exp>Date.now(),setTok=r=>{tok=r.access_token;LS.tok=tok;LS.exp=Date.now()+(r.expires_in-60)*1000};
+function expired(){tok=null;LS.removeItem("tok");clearInterval(timer);if(cfg()){$("#lock").hidden=false;$("#lerr").textContent="Seja je potekla. Tapni »Odkleni« za nadaljevanje."}else{showSetup();err("Seja je potekla. Prijavi se znova.")}}
+function newToken(){return new Promise((res,rej)=>{
+  if(!window.google)return rej(new Error("Google prijava še ni naložena. Poskusi znova."));
+  const c={client_id:cid,scope:SC,prompt:"",callback:r=>{if(r.error)return rej(new Error("Prijava ni uspela: "+r.error));setTok(r);if(!LS.sub)fetch("https://www.googleapis.com/oauth2/v3/userinfo",{headers:{Authorization:"Bearer "+tok}}).then(x=>x.json()).then(u=>LS.sub=u.sub||"").catch(()=>{});res()},error_callback:e=>rej(new Error("Prijava ni uspela ("+(e.type||"napaka")+")."))};
+  if(LS.sub)c.hint=LS.sub;google.accounts.oauth2.initTokenClient(c).requestAccessToken();
+})}
 
 function rng(){
   const n=new Date(),k=pr.k,o=pr.off||0;let a,b,lab;
@@ -120,7 +129,7 @@ function rng(){
 }
 async function api(path,opt={}){
   const r=await fetch("https://sheets.googleapis.com/v4/spreadsheets/"+sid+path,{...opt,headers:{Authorization:"Bearer "+tok,"Content-Type":"application/json"}});
-  if(r.status===401){tok=null;LS.removeItem("tok");showSetup();err("Seja je potekla. Prijavi se znova.");throw new Error("auth")}
+  if(r.status===401){expired();throw new Error("auth")}
   if(!r.ok){let m=r.status;try{m=(await r.json()).error.message}catch(e){}throw new Error(m)}
   return r.json();
 }
@@ -130,9 +139,10 @@ async function ensure(){
   await api("/values/Vnosi!A1:I1?valueInputOption=RAW",{method:"PUT",body:JSON.stringify({values:[["datum","vrsta","kategorija","znesek","opomba","oseba","račun","skupno","račun2"]]})});
 }
 async function load(){
+  if(!tokOk()){expired();return}
   try{
     const d=await api("/values/Vnosi!A2:I?valueRenderOption=UNFORMATTED_VALUE");
-    rows=(d.values||[]).map((r,i)=>{const by=String(r[5]||"");return {n:i+2,date:String(r[0]||""),t:r[1],cat:String(r[2]||""),amt:+r[3]||0,note:r[4]||"",by,acc:al(String(r[6]||""),by),acc2:al(String(r[8]||""),by)}}).filter(x=>x.t);
+    rows=(d.values||[]).map((r,i)=>{const by=String(r[5]||""),rf=r[1]==="povračilo";return {n:i+2,date:String(r[0]||""),t:rf?"odhodek":r[1],cat:String(r[2]||""),amt:rf?-(+r[3]||0):(+r[3]||0),rf,note:r[4]||"",by,acc:al(String(r[6]||""),by),acc2:al(String(r[8]||""),by)}}).filter(x=>x.t);
     err();render();
   }catch(e){if(e.message!=="auth")err("Napaka: "+e.message)}
 }
@@ -166,10 +176,13 @@ async function unlock(){
   try{await verify();rv=true;clearTimeout(rvT);rvT=setTimeout(()=>{rv=false;render()},120000);err();render();return true}
   catch(e){err(e.name==="NotAllowedError"?"Potrditev je bila preklicana ali ni uspela.":(e.message||"Potrditev ni uspela."));return false}
 }
-async function appUnlock(){
+async function appUnlock(auto){
   if(lbusy)return;lbusy=true;$("#lerr").textContent="";
-  try{await verify();$("#lock").hidden=true;if(tok&&sid&&!$("#view").hidden)load()}
-  catch(e){$("#lerr").textContent=e.name==="NotAllowedError"?"Tapni »Odkleni« in potrdi s prstnim odtisom ali zaklepom zaslona.":(e.message||"Potrditev ni uspela.");$("#lcont").hidden=e.code!=="nosup"}
+  try{
+    if(cfg()&&!tokOk()){if(auto)throw Object.assign(new Error(""),{name:"NotAllowedError"});await newToken()}
+    await verify();$("#lock").hidden=true;
+    if(tokOk()&&sid){if($("#view").hidden)start();else load()}
+  }catch(e){$("#lerr").textContent=e.name==="NotAllowedError"?"Tapni »Odkleni« in potrdi s prstnim odtisom ali zaklepom zaslona.":(e.message||"Potrditev ni uspela.");$("#lcont").hidden=e.code!=="nosup"}
   lbusy=false;
 }
 function openVM(title,html,onOk,onClick,okLabel){
@@ -198,8 +211,8 @@ function openAdd(o={}){
   $("#acc").value=LS.acc||ACC.find(a=>a.toLowerCase().endsWith(" "+(who||"?").toLowerCase()))||ACC[0];setT(o.t||"odhodek");$("#cat").value=o.cat||"";
 }
 function rowH(x,dl){
-  const tr=x.t==="prenos",c=x.t==="prihodek"?"in":tr?"mu":"ex";
-  return `<div class="r"><i class="ic" style="background:${tr?"#8a8fa8":col(x.cat)}">${tr?"⇄":esc(ico(x.cat))}</i><div><div>${tr?"Prenos":esc(x.cat)}</div><small>${esc(tr?x.acc+" → "+x.acc2:x.acc)}${x.by&&x.by!=="Uvoz"?" · "+esc(x.by):""}</small>${x.note?`<div><small><i>${esc(x.note)}</i></small></div>`:""}</div><div style="text-align:right"><span class="${c}">${fmt(x.amt)}</span>${dl?`<br><button class="ib" style="font-size:13px;padding:0" data-n="${x.n}" aria-label="Izbriši">✕</button>`:""}</div></div>`;
+  const tr=x.t==="prenos",c=(x.t==="prihodek"||x.rf)?"in":tr?"mu":"ex";
+  return `<div class="r"><i class="ic" style="background:${tr?"#8a8fa8":col(x.cat)}">${tr?"⇄":esc(ico(x.cat))}</i><div><div>${tr?"Prenos":x.rf?"Povračilo · "+esc(x.cat):esc(x.cat)}</div><small>${esc(tr?x.acc+" → "+x.acc2:x.acc)}${x.by&&x.by!=="Uvoz"?" · "+esc(x.by):""}</small>${x.note?`<div><small><i>${esc(x.note)}</i></small></div>`:""}</div><div style="text-align:right"><span class="${c}">${x.rf?"+"+fmt(-x.amt):fmt(x.amt)}</span>${dl?`<br><button class="ib" style="font-size:13px;padding:0" data-n="${x.n}" aria-label="Izbriši">✕</button>`:""}</div></div>`;
 }
 
 function vAcc(){
@@ -211,33 +224,40 @@ function vAcc(){
   `<button class="p" data-ln="1" style="width:100%;margin-top:10px">Prilagodi</button>`;
 }
 function vCat(){
-  const e=cs("odhodek"),inc=sum(pick(mr(),"prihodek")),T=sum(Object.values(e).map(v=>({amt:v}))),C=2*Math.PI*70,sv=selCat&&e[selCat]!=null;let off=0,arcs="";
-  Object.entries(e).sort((a,b)=>b[1]-a[1]).forEach(([n,v])=>{const l=v/T*C,s=sv&&selCat===n;arcs+=`<circle data-seg="${enc(n)}" cx="100" cy="100" r="70" fill="none" stroke="${col(n)}" stroke-width="${s?27:20}" opacity="${sv&&!s?.35:1}" stroke-dasharray="${l} ${C-l}" stroke-dashoffset="${-off}" transform="rotate(-90 100 100)" style="cursor:pointer"/>`;off+=l});
+  const e=cs("odhodek"),inc=sum(pick(mr(),"prihodek")),T=sum(Object.values(e).map(v=>({amt:v}))),Tp=Math.max(1,sum(Object.values(e).filter(v=>v>0).map(v=>({amt:v})))),C=2*Math.PI*70,sv=selCat&&e[selCat]!=null;let off=0,arcs="";
+  Object.entries(e).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).forEach(([n,v])=>{const l=v/Tp*C,s=sv&&selCat===n;arcs+=`<circle data-seg="${enc(n)}" cx="100" cy="100" r="70" fill="none" stroke="${col(n)}" stroke-width="${s?27:20}" opacity="${sv&&!s?.35:1}" stroke-dasharray="${l} ${C-l}" stroke-dashoffset="${-off}" transform="rotate(-90 100 100)" style="cursor:pointer"/>`;off+=l});
   const tx=(y,t,st)=>`<text x="100" y="${y}" text-anchor="middle" style="pointer-events:none;${st}">${t}</text>`;
-  const mid=sv?tx(88,esc(selCat.length>18?selCat.slice(0,17)+"…":selCat),"fill:var(--tx);font-size:12px")+tx(110,fmt(e[selCat]),"fill:var(--ex);font-size:17px;font-weight:600")+tx(128,Math.round(e[selCat]/T*100)+" % vseh stroškov","fill:var(--mu);font-size:11px"):tx(92,"Stroški","fill:var(--tx);font-size:13px")+tx(112,fmt(T),"fill:var(--ex);font-size:17px;font-weight:600")+tx(130,fmt(inc),"fill:var(--in);font-size:12px");
+  const mid=sv?tx(88,esc(selCat.length>18?selCat.slice(0,17)+"…":selCat),"fill:var(--tx);font-size:12px")+tx(110,fmt(e[selCat]),"fill:var(--ex);font-size:17px;font-weight:600")+tx(128,Math.round(Math.max(0,e[selCat])/Tp*100)+" % vseh stroškov","fill:var(--mu);font-size:11px"):tx(92,"Stroški","fill:var(--tx);font-size:13px")+tx(112,fmt(T),"fill:var(--ex);font-size:17px;font-weight:600")+tx(130,fmt(inc),"fill:var(--in);font-size:12px");
   const all=cats("odhodek").sort((a,b)=>(e[b]||0)-(e[a]||0)||a.localeCompare(b));
   return `<div class="card"><svg viewBox="0 0 200 200" style="width:100%;max-width:250px;display:block;margin:auto"><circle cx="100" cy="100" r="70" fill="none" stroke="var(--bd)" stroke-width="20"/>${arcs}<circle data-cx="1" cx="100" cy="100" r="52" fill="transparent"/>${mid}</svg><p class="mu" style="text-align:center;margin:4px 0 0">Tapni barvo za podrobnosti, kategorijo spodaj za nov odhodek.</p></div><div class="grid">${all.map(n=>`<div data-cat="${enc(n)}"><div>${esc(n)}</div><i class="ic" style="background:${col(n)}">${esc(ico(n))}</i><b>${fmt(e[n]||0)}</b></div>`).join("")}</div>`;
 }
+function txList(L,dl){
+  const g={};L.forEach(x=>(g[x.date]=g[x.date]||[]).push(x));
+  return Object.keys(g).map(d=>`<div class="day"><span><b>${d.slice(8)}</b> <small>${WD[new Date(d+"T12:00:00").getDay()]} ${+d.slice(5,7)}. ${d.slice(0,4)}</small></span><b class="ex" style="font-size:18px">${fmt(sum(pick(g[d],"odhodek")))}</b></div>`+g[d].map(x=>rowH(x,dl)).join("")).join("");
+}
 function vTx(){
   const L=mr().filter(x=>["odhodek","prihodek","prenos"].includes(x.t)).sort((a,b)=>cmp(b,a));
-  if(!L.length)return'<p class="mu">V tem obdobju ni vnosov.</p>';
-  const g={};L.forEach(x=>(g[x.date]=g[x.date]||[]).push(x));
-  return Object.keys(g).map(d=>`<div class="day"><span><b>${d.slice(8)}</b> <small>${WD[new Date(d+"T12:00:00").getDay()]} ${+d.slice(5,7)}. ${d.slice(0,4)}</small></span><b class="ex" style="font-size:18px">${fmt(sum(pick(g[d],"odhodek")))}</b></div>`+g[d].map(x=>rowH(x,1)).join("")).join("");
+  return L.length?txList(L,1):'<p class="mu">V tem obdobju ni vnosov.</p>';
+}
+function showCat(c){
+  const L=mr().filter(x=>x.t==="odhodek"&&x.cat===c).sort((a,b)=>cmp(b,a));
+  $("#vf").innerHTML=`<b class="w">${esc(c)}</b><small class="w">${esc(R.lab)}${pf?" · "+esc(pf):""} · vnosov: ${L.length} · skupaj <b class="ex">${fmt(sum(L))}</b></small><div class="w">${txList(L,0)}</div><button type="button" class="w p" data-x="1">Zapri</button>`;
+  $("#vm").hidden=false;$("#vf").onclick=ev=>{if(ev.target.closest("[data-x]"))$("#vm").hidden=true};$("#vf").onsubmit=ev=>ev.preventDefault();
 }
 function chartBars(){
   const span=db(R.a,R.b)+1,mo=span>62,keys=[];
   if(mo){for(let d=new Date(+R.a.slice(0,4),+R.a.slice(5,7)-1,1);ym(d)<=R.b.slice(0,7);d.setMonth(d.getMonth()+1))keys.push(ym(d))}else for(let i=0;i<span;i++)keys.push(dAdd(R.a,i));
   const idx={};keys.forEach((k,i)=>idx[k]=i);const cl=keys.map(()=>({}));
   pick(mr(),"odhodek").forEach(x=>{const i=idx[mo?x.date.slice(0,7):x.date];if(i!=null)cl[i][x.cat]=(cl[i][x.cat]||0)+x.amt});
-  const mx=Math.max(1,...cl.map(o=>Object.values(o).reduce((a,b)=>a+b,0))),W=300/keys.length,lb=k=>mo?k.slice(5)+"/"+k.slice(2,4):(+k.slice(8))+"."+(+k.slice(5,7))+".";let s="";
-  cl.forEach((o,i)=>{let yb=108;Object.entries(o).forEach(([c,v])=>{const h=v/mx*95;yb-=h;s+=`<rect x="${i*W+.5}" y="${yb}" width="${Math.max(.8,W-1)}" height="${h}" fill="${col(c)}"/>`})});
+  const mx=Math.max(1,...cl.map(o=>Object.values(o).reduce((a,b)=>a+Math.max(0,b),0))),W=300/keys.length,lb=k=>mo?k.slice(5)+"/"+k.slice(2,4):(+k.slice(8))+"."+(+k.slice(5,7))+".";let s="";
+  cl.forEach((o,i)=>{let yb=108;Object.entries(o).forEach(([c,v])=>{const h=Math.max(0,v)/mx*95;yb-=h;s+=`<rect x="${i*W+.5}" y="${yb}" width="${Math.max(.8,W-1)}" height="${h}" fill="${col(c)}"/>`})});
   return `<svg viewBox="0 0 300 125" class="ch">${s}<text x="0" y="121">${lb(keys[0])}</text><text x="300" y="121" text-anchor="end">${lb(keys[keys.length-1])}</text><text x="300" y="9" text-anchor="end">${Math.round(mx)} €</text></svg>`;
 }
 function chart12(){
   const e=R.b<today()?R.b:today(),y=+e.slice(0,4),m=+e.slice(5,7),ms=[];for(let k=11;k>=0;k--)ms.push(ym(new Date(y,m-1-k,1)));
   const E={},I={};rows.filter(x=>!pf||x.by===pf).forEach(x=>{const k=x.date.slice(0,7);if(x.t==="odhodek")E[k]=(E[k]||0)+x.amt;else if(x.t==="prihodek")I[k]=(I[k]||0)+x.amt});
   const mx=Math.max(1,...ms.map(k=>Math.max(E[k]||0,I[k]||0))),W=25;let s="";
-  ms.forEach((k,i)=>{const a=(E[k]||0)/mx*95,b=(I[k]||0)/mx*95;s+=`<rect x="${i*W+2}" y="${108-a}" width="10" height="${a}" fill="var(--ex)"/><rect x="${i*W+12}" y="${108-b}" width="10" height="${b}" fill="var(--in)"/><text x="${i*W+12}" y="121" text-anchor="middle">${+k.slice(5)}</text>`});
+  ms.forEach((k,i)=>{const a=Math.max(0,E[k]||0)/mx*95,b=Math.max(0,I[k]||0)/mx*95;s+=`<rect x="${i*W+2}" y="${108-a}" width="10" height="${a}" fill="var(--ex)"/><rect x="${i*W+12}" y="${108-b}" width="10" height="${b}" fill="var(--in)"/><text x="${i*W+12}" y="121" text-anchor="middle">${+k.slice(5)}</text>`});
   return {svg:`<svg viewBox="0 0 300 125" class="ch">${s}</svg>`,avg:ms.reduce((a,k)=>a+(E[k]||0),0)/12,avgI:ms.reduce((a,k)=>a+(I[k]||0),0)/12};
 }
 function chartSav(){
@@ -250,13 +270,13 @@ function chartSav(){
 <div style="display:flex;flex-wrap:wrap;gap:4px 12px"><small><b>━</b> skupaj ${mk(sum(SAV.map(n=>({amt:lastV(n)}))))}</small>${SAV.map((n,i)=>`<small><b style="color:${PC[i]}">■</b> ${esc(n)} ${mk(lastV(n))}</small>`).join("")}</div>${rv?"":'<small>Zneski so skriti. Odkleni jih v zavihku Računi (👁).</small>'}`;
 }
 function vOv(){
-  const m=mr(),ex=sum(pick(m,"odhodek")),inc=sum(pick(m,"prihodek")),e=cs("odhodek"),n=db(R.a,R.b)+1,td=today(),dn=Math.max(1,Math.min(n,td<R.a?0:db(R.a,td)+1));
+  const m=mr(),ex=sum(pick(m,"odhodek")),inc=sum(pick(m,"prihodek")),e=cs("odhodek"),tp=Math.max(1,sum(Object.values(e).filter(v=>v>0).map(v=>({amt:v})))),n=db(R.a,R.b)+1,td=today(),dn=Math.max(1,Math.min(n,td<R.a?0:db(R.a,td)+1));
   const wk=dAdd(td,-6),ex1=pick(rows,"odhodek").filter(x=>!pf||x.by===pf),c12=chart12();
   return `<div style="text-align:center"><small>Stanje</small><div style="font-size:26px" class="${inc-ex<0?"ex":"in"}">${fmt(inc-ex)}</div></div>
 <div class="two"><div style="background:var(--ex);color:#fff"><small style="color:#fff">Stroški</small><div style="font-size:22px">${fmt(ex)}</div></div><div><small>Dohodki</small><div class="in" style="font-size:22px">${fmt(inc)}</div></div></div>
 <div class="card">${chartBars()}</div>
 <div class="three"><div><small>Dan (povp.)</small><div class="ex">${fmt(ex/dn)}</div></div><div><small>Danes</small><div>${fmt(sum(ex1.filter(x=>x.date===td)))}</div></div><div><small>Zadnjih 7 dni</small><div>${fmt(sum(ex1.filter(x=>x.date>=wk&&x.date<=td)))}</div></div></div>
-${Object.entries(e).sort((a,b)=>b[1]-a[1]).map(([c,v])=>`<div class="r"><i class="ic" style="background:${col(c)}">${esc(ico(c))}</i><div><div class="sp"><span>${esc(c)}</span><b>${fmt(v)}</b></div><div class="bar" style="margin-top:6px"><i style="width:${v/ex*100}%;background:${col(c)}"></i></div><small>${Math.round(v/ex*100)} %</small></div></div>`).join("")}
+${Object.entries(e).sort((a,b)=>b[1]-a[1]).map(([c,v])=>`<div class="r" data-ov="${enc(c)}" style="cursor:pointer"><i class="ic" style="background:${col(c)}">${esc(ico(c))}</i><div><div class="sp"><span>${esc(c)}</span><b>${fmt(v)}</b></div><div class="bar" style="margin-top:6px"><i style="width:${Math.max(0,v)/tp*100}%;background:${col(c)}"></i></div><small>${Math.round(Math.max(0,v)/tp*100)} %</small></div></div>`).join("")}
 <h3><span>Zadnjih 12 mesecev</span></h3><div class="card">${c12.svg}<div class="sp"><small><b class="ex">■</b> stroški (povp. ${fmt(c12.avg)})</small><small><b class="in">■</b> dohodki (povp. ${fmt(c12.avgI)})</small></div></div>
 <label class="card sp" style="align-items:center"><span>Prikaži prihranke na grafu</span><input type="checkbox" data-sav ${LS.sav?"checked":""}></label>${LS.sav?`<div class="card"><b>Prihranki in investicije</b>${chartSav()}</div>`:""}`;
 }
@@ -267,7 +287,7 @@ function vSk(){
   const tt=c=>Object.values(cm[c]).reduce((a,b)=>a+b,0),T=sum(E),cl=Object.keys(cm).sort((a,b)=>tt(b)-tt(a));
   return `<div class="card"><small>Skupaj stroški (${esc(R.lab)})</small><div style="font-size:26px" class="ex">${fmt(T)}</div><small>Dohodki: ${fmt(sum(I))}</small>
 ${P.map(p=>`<div class="sp" style="margin-top:8px"><span><b style="color:${pc(p)}">■</b> ${esc(p||"?")}</span><span><b class="ex">${fmt(sum(E.filter(x=>x.by===p)))}</b> <small>dohodki ${fmt(sum(I.filter(x=>x.by===p)))}</small></span></div>`).join("")}</div>
-${cl.map(c=>`<div class="r"><i class="ic" style="background:${col(c)}">${esc(ico(c))}</i><div><div class="sp"><span>${esc(c)}</span><b>${fmt(tt(c))}</b></div><div class="bar" style="margin:6px 0;display:flex">${P.map(p=>`<i style="width:${(cm[c][p]||0)/T*100}%;background:${pc(p)}"></i>`).join("")}</div><small>${P.filter(p=>cm[c][p]).map(p=>esc(p||"?")+" "+fmt(cm[c][p])).join(" · ")}</small></div></div>`).join("")||'<p class="mu">V tem obdobju ni vnosov.</p>'}`;
+${cl.map(c=>`<div class="r"><i class="ic" style="background:${col(c)}">${esc(ico(c))}</i><div><div class="sp"><span>${esc(c)}</span><b>${fmt(tt(c))}</b></div><div class="bar" style="margin:6px 0;display:flex">${P.map(p=>`<i style="width:${Math.max(0,cm[c][p]||0)/Math.max(1,T)*100}%;background:${pc(p)}"></i>`).join("")}</div><small>${P.filter(p=>cm[c][p]).map(p=>esc(p||"?")+" "+fmt(cm[c][p])).join(" · ")}</small></div></div>`).join("")||'<p class="mu">V tem obdobju ni vnosov.</p>'}`;
 }
 const V={acc:vAcc,cat:vCat,tx:vTx,ov:vOv,sk:vSk};
 function render(){
@@ -279,13 +299,13 @@ function render(){
 }
 function lists(){
   $("#da").innerHTML=[...ACC,...(ftype==="prenos"?[...LN,...SAV]:[])].map(a=>`<option value="${esc(a)}">`).join("");
-  $("#dc").innerHTML=(ftype==="prenos"?[]:cats(ftype)).map(a=>`<option value="${esc(a)}">`).join("");
+  $("#dc").innerHTML=(ftype==="prenos"?[]:cats(ftype==="povračilo"?"odhodek":ftype)).map(a=>`<option value="${esc(a)}">`).join("");
 }
 function setT(t){
   ftype=t;$$("#seg button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));
-  $("#cat").hidden=t==="prenos";$("#acc2").hidden=t!=="prenos";$("#acc").placeholder=t==="prenos"?"Iz računa":"Račun";$("#acc2").placeholder="Na račun ali kredit";lists();
+  $("#cat").hidden=t==="prenos";$("#acc2").hidden=t!=="prenos";$("#acc").placeholder=t==="prenos"?"Iz računa":t==="povračilo"?"Račun, kamor je prišlo":"Račun";$("#cat").placeholder=t==="povračilo"?"Kategorija stroška":"Kategorija";$("#acc2").placeholder="Na račun ali kredit";lists();
 }
-function showSetup(){$("#setup").hidden=false;$("#view").hidden=true;$("#nav").hidden=true;$("#fab").hidden=true;$("#eye").hidden=true;$("#mnav").hidden=true;$("#pf").hidden=true;$("#ttl").hidden=false;$("#cid").value=cid;$("#sh").value=sid;$("#imp").hidden=!tok;$("#ipn").value=who;$("#back").hidden=!tok;clearInterval(timer)}
+function showSetup(){$("#setup").hidden=false;$("#view").hidden=true;$("#nav").hidden=true;$("#fab").hidden=true;$("#eye").hidden=true;$("#mnav").hidden=true;$("#pf").hidden=true;$("#ttl").hidden=false;$("#cid").value=cid;$("#sh").value=sid;$("#imp").hidden=!tok;$("#ipn").value=who;$("#back").hidden=!tok;$("#logout").hidden=!tok;clearInterval(timer)}
 function start(){$("#setup").hidden=true;$("#view").hidden=false;$("#nav").hidden=false;err();load();clearInterval(timer);timer=setInterval(load,30000)}
 function parseCSV(t,d=","){const r=[];let row=[],f="",q=false;for(let i=0;i<t.length;i++){const c=t[i];if(q){if(c=='"'){if(t[i+1]=='"'){f+='"';i++}else q=false}else f+=c}else if(c=='"')q=true;else if(c==d){row.push(f);f=""}else if(c=="\n"||c=="\r"){if(c=="\r"&&t[i+1]=="\n")i++;row.push(f);r.push(row);row=[];f=""}else f+=c}if(f||row.length){row.push(f);r.push(row)}return r}
 
@@ -298,11 +318,12 @@ $("#login").onclick=()=>{
 };
 async function onTok(r){
   if(r.error)return err("Prijava ni uspela: "+r.error);
-  tok=r.access_token;LS.tok=tok;LS.exp=Date.now()+(r.expires_in-60)*1000;
-  try{const u=await(await fetch("https://www.googleapis.com/oauth2/v3/userinfo",{headers:{Authorization:"Bearer "+tok}})).json();who=u.given_name||u.name||"Jaz";LS.who=who;await ensure();start()}
+  setTok(r);
+  try{const u=await(await fetch("https://www.googleapis.com/oauth2/v3/userinfo",{headers:{Authorization:"Bearer "+tok}})).json();who=u.given_name||u.name||"Jaz";LS.who=who;LS.sub=u.sub||"";LS.removeItem("out");await ensure();start()}
   catch(e){if(e.message!=="auth")err("Napaka: "+e.message)}
 }
 $("#pf").onclick=e=>{const b=e.target.closest("[data-f]");if(!b)return;pf=b.dataset.f;LS.pf=pf;render()};
+$("#logout").onclick=()=>{try{if(tok&&window.google)google.accounts.oauth2.revoke(tok,()=>{})}catch(e){}tok=null;["tok","exp","sub"].forEach(k=>LS.removeItem(k));LS.out="1";rows=[];clearInterval(timer);$("#lock").hidden=true;showSetup();err("Odjavljen/a. Za ponovno prijavo tapni »Prijava z Google«.")};
 $("#cog").onclick=showSetup;$("#back").onclick=start;$("#rstfp").onclick=()=>{LS.removeItem("cred");err("Prstni odtis ponastavljen. Ob naslednjem odklepu ga nastaviš znova.")};
 $("#mon").onclick=openPeriod;
 $("#prev").onclick=()=>{pr.off=(pr.off||0)-1;savePr();render()};
@@ -319,13 +340,14 @@ $("#f").onsubmit=async e=>{
   catch(x){if(x.message!=="auth")err("Shranjevanje ni uspelo: "+x.message)}
 };
 $("#view").onclick=async e=>{
-  const t=e.target,d=t.closest("[data-n]"),sv=t.closest("[data-sv]"),ln=t.closest("[data-ln]"),sg=t.closest("[data-seg]"),ct=t.closest("[data-cat]");
+  const t=e.target,d=t.closest("[data-n]"),sv=t.closest("[data-sv]"),ln=t.closest("[data-ln]"),sg=t.closest("[data-seg]"),ct=t.closest("[data-cat]"),ov=t.closest("[data-ov]");
   try{
     if(d){if(confirm("Izbrišem ta vnos?")){await api("/values/Vnosi!A"+d.dataset.n+":I"+d.dataset.n+":clear",{method:"POST",body:"{}"});await load()}}
     else if(sv){if(await unlock())editSav(+sv.dataset.sv)}
     else if(ln){if(await unlock())editLoans()}
     else if(sg){const n=dec(sg.dataset.seg);selCat=selCat===n?"":n;render()}
     else if(ct)openAdd({cat:dec(ct.dataset.cat)});
+    else if(ov)showCat(dec(ov.dataset.ov));
     else if(t.closest("[data-cx]")){selCat="";render()}
   }catch(x){if(x.message!=="auth")err("Napaka: "+x.message)}
 };
@@ -348,14 +370,13 @@ $("#file").onchange=async e=>{
     await load();$("#ip").textContent="Uvoz končan: "+R.length+" vnosov.";err();
   }catch(x){if(x.message!=="auth")err("Uvoz ni uspel: "+x.message)}
 };
-$("#lbtn").onclick=appUnlock;$("#lcont").onclick=()=>$("#lock").hidden=true;
+$("#lbtn").onclick=()=>appUnlock(false);$("#lcont").onclick=()=>{$("#lock").hidden=true;if(tokOk()&&sid&&$("#view").hidden)start()};
 document.addEventListener("visibilitychange",()=>{
   if(document.hidden){rv=false;hideT=Date.now()}
-  else{if(sid&&hideT&&Date.now()-hideT>30000&&$("#lock").hidden){$("#lock").hidden=false;appUnlock()}if(tok&&sid&&!$("#view").hidden)load()}
+  else{if(cfg()&&hideT&&Date.now()-hideT>30000&&$("#lock").hidden){$("#lock").hidden=false;appUnlock(true)}if(tok&&sid&&!$("#view").hidden)load()}
 });
 if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
-if(tok&&sid)start();else showSetup();
-if(sid)appUnlock();else $("#lock").hidden=true;
+if(cfg()){if(tokOk())start();else tok=null;appUnlock(true)}else{$("#lock").hidden=true;showSetup()}
 </script>
 </body>
 </html>
