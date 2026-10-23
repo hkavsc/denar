@@ -185,16 +185,22 @@ async function appUnlock(auto){
   }catch(e){$("#lerr").textContent=e.name==="NotAllowedError"?"Tapni »Odkleni« in potrdi s prstnim odtisom ali zaklepom zaslona.":(e.message||"Potrditev ni uspela.");$("#lcont").hidden=e.code!=="nosup"}
   lbusy=false;
 }
+let mh=0;
+function mOpen(id){$(id).hidden=false;if(!mh){history.pushState({m:1},"");mh=1}}
+function mClose(){$("#sheet").hidden=true;$("#vm").hidden=true;if(mh){mh=0;history.back()}}
+window.addEventListener("popstate",()=>{if(mh){mh=0;$("#sheet").hidden=true;$("#vm").hidden=true}});
+const hdr=t=>`<div class="w sp" style="position:sticky;top:0;background:var(--bg);z-index:1;align-items:center"><b>${t}</b><button type="button" class="ib" data-x="1" aria-label="Zapri">✕</button></div>`;
 function openVM(title,html,onOk,onClick,okLabel){
-  $("#vf").innerHTML=`<b class="w">${title}</b>${html}<button type="button" data-x="1">Prekliči</button><button class="p" type="submit">${okLabel||"Shrani"}</button>`;$("#vm").hidden=false;
-  $("#vf").onclick=ev=>{if(ev.target.closest("[data-x]"))$("#vm").hidden=true;else if(onClick)onClick(ev)};
-  $("#vf").onsubmit=async ev=>{ev.preventDefault();try{await onOk(new FormData($("#vf")));$("#vm").hidden=true;err()}catch(x){if(x.message!=="auth")err(x.message)}};
+  $("#vf").innerHTML=`${hdr(title)}${html}<button type="button" data-x="1">Prekliči</button><button class="p" type="submit">${okLabel||"Shrani"}</button>`;mOpen("#vm");
+  delete $("#vf").dataset.sw;$("#vf").style.touchAction="";
+  $("#vf").onclick=ev=>{if(ev.target.closest("[data-x]"))mClose();else if(onClick)onClick(ev)};
+  $("#vf").onsubmit=async ev=>{ev.preventDefault();try{await onOk(new FormData($("#vf")));mClose();err()}catch(x){if(x.message!=="auth")err(x.message)}};
 }
 function openPeriod(){
   const O=[["w","Ta teden"],["m","Ta mesec"],["y","To leto"],["7","Zadnjih 7 dni"]];
   openVM("Časovno obdobje",O.map(([k,l])=>`<button type="button" class="w ${pr.k===k?"on":""}" data-k="${k}">${l}</button>`).join("")+`<b class="w" style="margin-top:6px">Po meri</b><label class="mu">Od<input name="od" type="date" value="${R.a}"></label><label class="mu">Do<input name="do" type="date" value="${R.b}"></label>`,
     async f=>{const a=f.get("od"),b=f.get("do");if(!a||!b)throw new Error("Izberi obe datumski polji.");pr={k:"c",from:a,to:b,off:0};savePr();render()},
-    ev=>{const b=ev.target.closest("[data-k]");if(b){pr={k:b.dataset.k,off:0};savePr();$("#vm").hidden=true;render()}},"Uporabi po meri");
+    ev=>{const b=ev.target.closest("[data-k]");if(b){pr={k:b.dataset.k,off:0};savePr();mClose();render()}},"Uporabi po meri");
 }
 function editSav(i){
   const n=SAV[i],v=lastV(n);
@@ -207,7 +213,7 @@ function editLoans(){
     async f=>{const out=[];L.forEach((l,i)=>{const b=parseFloat(f.get("b"+i)),r=parseFloat(f.get("r"+i))||0;if(isNaN(b))return;if(l.bal==null||Math.abs(b-l.bal)>=.005||r!==l.rata)out.push([today(),"kredit","",b,r,who,l.n,"",""])});if(out.length)await addMany(out)});
 }
 function openAdd(o={}){
-  $("#sheet").hidden=false;$("#date").value=today();$("#amt").value="";$("#note").value="";$("#acc2").value="";
+  mOpen("#sheet");$("#date").value=today();$("#amt").value="";$("#note").value="";$("#acc2").value="";
   $("#acc").value=LS.acc||ACC.find(a=>a.toLowerCase().endsWith(" "+(who||"?").toLowerCase()))||ACC[0];setT(o.t||"odhodek");$("#cat").value=o.cat||"";
 }
 function rowH(x,dl){
@@ -241,8 +247,8 @@ function vTx(){
 }
 function showCat(c){
   const L=mr().filter(x=>x.t==="odhodek"&&x.cat===c).sort((a,b)=>cmp(b,a));
-  $("#vf").innerHTML=`<b class="w">${esc(c)}</b><small class="w">${esc(R.lab)}${pf?" · "+esc(pf):""} · vnosov: ${L.length} · skupaj <b class="ex">${fmt(sum(L))}</b></small><div class="w">${txList(L,0)}</div><button type="button" class="w p" data-x="1">Zapri</button>`;
-  $("#vm").hidden=false;$("#vf").onclick=ev=>{if(ev.target.closest("[data-x]"))$("#vm").hidden=true};$("#vf").onsubmit=ev=>ev.preventDefault();
+  $("#vf").innerHTML=`${hdr(esc(c))}<small class="w">${esc(R.lab)}${pf?" · "+esc(pf):""} · vnosov: ${L.length} · skupaj <b class="ex">${fmt(sum(L))}</b></small><div class="w">${txList(L,0)}</div><button type="button" class="w p" data-x="1">Zapri</button>`;
+  mOpen("#vm");$("#vf").onclick=ev=>{if(ev.target.closest("[data-x]"))mClose()};$("#vf").onsubmit=ev=>ev.preventDefault();$("#vf").dataset.sw="1";$("#vf").style.touchAction="pan-y";
 }
 function chartBars(){
   const span=db(R.a,R.b)+1,mo=span>62,keys=[];
@@ -331,12 +337,17 @@ $("#next").onclick=()=>{if((pr.off||0)<0){pr.off++;savePr();render()}};
 $("#nav").onclick=e=>{const b=e.target.closest("button");if(!b)return;tab=b.dataset.v;LS.tab=tab;render();scrollTo(0,0)};
 $("#fab").onclick=()=>openAdd();
 $("#eye").onclick=()=>{if(rv){rv=false;render()}else unlock()};
-$("#cancel").onclick=()=>$("#sheet").hidden=true;
+(()=>{let sx=0,sy=0;const vm=$("#vm"),vf=$("#vf"),hz=(dx,dy,m)=>Math.abs(dx)>m&&Math.abs(dx)>1.5*Math.abs(dy);
+  vm.addEventListener("touchstart",e=>{const t=e.touches[0];sx=t.clientX;sy=t.clientY},{passive:true});
+  vm.addEventListener("touchmove",e=>{if(!vf.dataset.sw)return;const t=e.touches[0],dx=t.clientX-sx;if(hz(dx,t.clientY-sy,12)){vf.style.transition="none";vf.style.transform=`translateX(${dx}px)`}},{passive:true});
+  vm.addEventListener("touchend",e=>{if(!vf.dataset.sw)return;const t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;vf.style.transition="";vf.style.transform="";if(hz(dx,dy,80))mClose()},{passive:true});
+})();
+$("#cancel").onclick=()=>mClose();$("#vm").onclick=e=>{if(e.target.id==="vm")mClose()};$("#sheet").onclick=e=>{if(e.target.id==="sheet")mClose()};
 $("#seg").onclick=e=>{const b=e.target.closest("button");if(b)setT(b.dataset.t)};
 $("#f").onsubmit=async e=>{
   e.preventDefault();const a=parseFloat($("#amt").value),t=ftype,c=$("#cat").value.trim(),ac=$("#acc").value.trim(),a2=$("#acc2").value.trim();
   if(!(a>0))return;if(!ac||(t==="prenos"?!a2:!c))return err("Izpolni kategorijo in račun.");
-  try{await add([$("#date").value,t,t==="prenos"?"":c,a,$("#note").value.trim(),who,ac,"",t==="prenos"?a2:""]);LS.acc=ac;$("#sheet").hidden=true;err()}
+  try{await add([$("#date").value,t,t==="prenos"?"":c,a,$("#note").value.trim(),who,ac,"",t==="prenos"?a2:""]);LS.acc=ac;mClose();err()}
   catch(x){if(x.message!=="auth")err("Shranjevanje ni uspelo: "+x.message)}
 };
 $("#view").onclick=async e=>{
