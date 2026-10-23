@@ -67,7 +67,7 @@ nav button{flex:1;border:0;background:none;border-radius:14px;font-size:20px;lin
 </main>
 <nav id="nav" hidden>
   <button data-v="acc">👛<small>Računi</small></button><button data-v="cat">🥧<small>Kategorije</small></button><button data-v="tx">🧾<small>Transakcije</small></button>
-  <button data-v="ov">📊<small>Pregled</small></button><button data-v="sk">👥<small>Skupaj</small></button>
+  <button data-v="ov">📊<small>Pregled</small></button>
 </nav>
 <button id="fab" hidden aria-label="Nov vnos">+</button>
 <button id="eye" hidden aria-label="Pokaži zneske">👁</button>
@@ -98,7 +98,7 @@ const LOANS=[{n:"Gorenjska Banka kredit",w:"Rok"},{n:"Intesa Ekosklad kredit Rok
 const p2=n=>String(n).padStart(2,"0"),ym=d=>d.getFullYear()+"-"+p2(d.getMonth()+1),ymd=d=>ym(d)+"-"+p2(d.getDate()),today=()=>ymd(new Date());
 const sh=s=>`${+s.slice(8)}. ${+s.slice(5,7)}. ${s.slice(0,4)}`,db=(a,b)=>Math.round((new Date(b+"T12:00:00")-new Date(a+"T12:00:00"))/864e5),dAdd=(s,n)=>ymd(new Date(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8)+n));
 let tok=(LS.tok&&+LS.exp>Date.now())?LS.tok:null,sid=LS.sid||"",cid=LS.cid||"",who=LS.who||"",rows=[],bal={},R={a:"",b:"",lab:""},timer,rv=false,rvT,selCat="",ftype="odhodek";
-let tab=["acc","cat","tx","ov","sk"].includes(LS.tab)?LS.tab:"acc",pf=LS.pf||"",pr={k:"m",off:0};try{pr=JSON.parse(LS.pr)||pr}catch(e){}
+let tab=["acc","cat","tx","ov"].includes(LS.tab)?LS.tab:"acc",pf=LS.pf||"",pr={k:"m",off:0};try{pr=JSON.parse(LS.pr)||pr}catch(e){}
 const fmt=n=>(Math.round(n*100)/100).toLocaleString("sl-SI",{minimumFractionDigits:2,maximumFractionDigits:2})+" €",mk=n=>rv?fmt(n):"•••• €";
 const esc=s=>{const d=document.createElement("div");d.textContent=s==null?"":String(s);return d.innerHTML};
 const err=t=>$("#err").textContent=t||"",sum=a=>a.reduce((s,x)=>s+x.amt,0),cmp=(a,b)=>a.date<b.date?-1:a.date>b.date?1:a.n-b.n;
@@ -287,19 +287,11 @@ ${Object.entries(e).sort((a,b)=>b[1]-a[1]).map(([c,v])=>`<div class="r" data-ov=
 <label class="card sp" style="align-items:center"><span>Prikaži prihranke na grafu</span><input type="checkbox" data-sav ${LS.sav?"checked":""}></label>${LS.sav?`<div class="card"><b>Prihranki in investicije</b>${chartSav()}</div>`:""}`;
 }
 function people(){const c={};rows.forEach(x=>{if(x.by&&x.by!=="Uvoz")c[x.by]=(c[x.by]||0)+1});if(who&&!c[who])c[who]=0;return Object.keys(c).sort((a,b)=>a===who?-1:b===who?1:c[b]-c[a])}
-function vSk(){
-  const Rr=rows.filter(inR),E=pick(Rr,"odhodek"),I=pick(Rr,"prihodek"),P=[...new Set([...people(),...Rr.filter(x=>x.t==="odhodek"||x.t==="prihodek").map(x=>x.by)])],pc=p=>PC[P.indexOf(p)%4],cm={};
-  E.forEach(x=>{const o=cm[x.cat]=cm[x.cat]||{};o[x.by]=(o[x.by]||0)+x.amt});
-  const tt=c=>Object.values(cm[c]).reduce((a,b)=>a+b,0),T=sum(E),cl=Object.keys(cm).sort((a,b)=>tt(b)-tt(a));
-  return `<div class="card"><small>Skupaj stroški (${esc(R.lab)})</small><div style="font-size:26px" class="ex">${fmt(T)}</div><small>Dohodki: ${fmt(sum(I))}</small>
-${P.map(p=>`<div class="sp" style="margin-top:8px"><span><b style="color:${pc(p)}">■</b> ${esc(p||"?")}</span><span><b class="ex">${fmt(sum(E.filter(x=>x.by===p)))}</b> <small>dohodki ${fmt(sum(I.filter(x=>x.by===p)))}</small></span></div>`).join("")}</div>
-${cl.map(c=>`<div class="r"><i class="ic" style="background:${col(c)}">${esc(ico(c))}</i><div><div class="sp"><span>${esc(c)}</span><b>${fmt(tt(c))}</b></div><div class="bar" style="margin:6px 0;display:flex">${P.map(p=>`<i style="width:${Math.max(0,cm[c][p]||0)/Math.max(1,T)*100}%;background:${pc(p)}"></i>`).join("")}</div><small>${P.filter(p=>cm[c][p]).map(p=>esc(p||"?")+" "+fmt(cm[c][p])).join(" · ")}</small></div></div>`).join("")||'<p class="mu">V tem obdobju ni vnosov.</p>'}`;
-}
-const V={acc:vAcc,cat:vCat,tx:vTx,ov:vOv,sk:vSk};
+const V={acc:vAcc,cat:vCat,tx:vTx,ov:vOv};
 function render(){
   if(!tok||$("#view").hidden)return;derive();R=rng();
   $("#mon").textContent=R.lab;$("#mnav").hidden=tab==="acc";$("#ttl").hidden=tab!=="acc";$("#prev").hidden=$("#next").hidden=pr.k==="7"||pr.k==="c";
-  const PP=people();$("#pf").hidden=tab==="acc"||tab==="sk"||PP.length<2;$("#pf").innerHTML=["",...PP].map(p=>`<button type="button" data-f="${esc(p)}" class="${pf===p?"on":""}">${p?esc(p):"Vsi"}</button>`).join("");
+  const PP=people();$("#pf").hidden=tab==="acc"||PP.length<2;$("#pf").innerHTML=["",...PP].map(p=>`<button type="button" data-f="${esc(p)}" class="${pf===p?"on":""}">${p?esc(p):"Vsi"}</button>`).join("");
   $("#fab").hidden=tab==="acc";$("#eye").hidden=tab!=="acc";$("#eye").classList.toggle("on",rv);
   $("#view").innerHTML=V[tab]();$$("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.v===tab));
 }
