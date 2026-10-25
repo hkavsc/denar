@@ -82,10 +82,10 @@ nav button{flex:1;border:0;background:none;border-radius:14px;font-size:20px;lin
   </form>
 </div>
 <div class="modal" id="vm" hidden><form id="vf"></form></div>
-<div id="lock" style="position:fixed;inset:0;z-index:30;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center">
+<div id="lock" hidden style="position:fixed;inset:0;z-index:30;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center">
   <img src="icon-192.png" width="120" height="120" alt="" style="border-radius:26px"><b style="font-size:24px">Finance</b>
-  <button class="p" id="lbtn" style="padding:12px 30px;font-size:18px">🔒 Odkleni</button>
-  <div id="lerr" style="color:var(--ex);font-size:14px;max-width:320px"></div><button id="lcont" hidden>Nadaljuj brez zaklepa</button>
+  <button class="p" id="lbtn" style="padding:12px 30px;font-size:18px">Nadaljuj</button>
+  <div id="lerr" style="color:var(--ex);font-size:14px;max-width:320px"></div>
 </div>
 <script>
 const $=s=>$$(s)[0],$$=s=>document.querySelectorAll(s),LS=localStorage,enc=encodeURIComponent,dec=decodeURIComponent;
@@ -111,7 +111,24 @@ const cats=t=>[...new Set(pick(rows,t).map(x=>x.cat))],lastV=n=>{const v=rows.fi
 const pn=by=>/rok/i.test(by)?"Rok":"Katja",al=(a,by)=>a==="Kartice"?"Bančni račun "+pn(by):a==="Gotovina"?"Gotovina "+pn(by):a;
 const savePr=()=>LS.pr=JSON.stringify(pr);
 const cfg=()=>sid&&who&&!LS.out,tokOk=()=>tok&&+LS.exp>Date.now(),setTok=r=>{tok=r.access_token;LS.tok=tok;LS.exp=Date.now()+(r.expires_in-60)*1000};
-function expired(){tok=null;LS.removeItem("tok");clearInterval(timer);if(cfg()){$("#lock").hidden=false;$("#lerr").textContent="Seja je potekla. Tapni »Odkleni« za nadaljevanje."}else{showSetup();err("Seja je potekla. Prijavi se znova.")}}
+let stale=false,armed=false;
+const mapRows=vals=>vals.map((r,i)=>{const by=String(r[5]||""),rf=r[1]==="povračilo";return {n:i+2,date:String(r[0]||""),t:rf?"odhodek":r[1],cat:String(r[2]||""),amt:rf?-(+r[3]||0):(+r[3]||0),rf,note:r[4]||"",by,acc:al(String(r[6]||""),by),acc2:al(String(r[8]||""),by)}}).filter(x=>x.t);
+function armRefresh(){
+  if(armed)return;armed=true;err("Prikazani so shranjeni podatki. Tapni kjer koli, da osvežiš prijavo.");
+  const h=async()=>{
+    document.removeEventListener("click",h,true);armed=false;
+    try{await newToken();stale=false;start()}
+    catch(e){armRefresh();err("Prijava ni uspela ("+(e.message||"napaka")+"). Tapni znova.")}
+  };
+  document.addEventListener("click",h,true);
+}
+function expired(){
+  tok=null;LS.removeItem("tok");clearInterval(timer);
+  if(!cfg()){showSetup();err("Seja je potekla. Prijavi se znova.");return}
+  try{if(!rows.length&&LS.vals)rows=mapRows(JSON.parse(LS.vals))}catch(e){}
+  if(rows.length){stale=true;showApp();render();armRefresh()}
+  else{$("#lock").hidden=false;$("#lerr").textContent="Seja je potekla. Tapni »Nadaljuj«."}
+}
 function newToken(){return new Promise((res,rej)=>{
   if(!window.google)return rej(new Error("Google prijava še ni naložena. Poskusi znova."));
   const c={client_id:cid,scope:SC,prompt:"",callback:r=>{if(r.error)return rej(new Error("Prijava ni uspela: "+r.error));setTok(r);if(!LS.sub)fetch("https://www.googleapis.com/oauth2/v3/userinfo",{headers:{Authorization:"Bearer "+tok}}).then(x=>x.json()).then(u=>LS.sub=u.sub||"").catch(()=>{});res()},error_callback:e=>rej(new Error("Prijava ni uspela ("+(e.type||"napaka")+")."))};
@@ -128,6 +145,7 @@ function rng(){
   return {a,b,lab};
 }
 async function api(path,opt={}){
+  if(!tokOk()){expired();throw new Error("auth")}
   const r=await fetch("https://sheets.googleapis.com/v4/spreadsheets/"+sid+path,{...opt,headers:{Authorization:"Bearer "+tok,"Content-Type":"application/json"}});
   if(r.status===401){expired();throw new Error("auth")}
   if(!r.ok){let m=r.status;try{m=(await r.json()).error.message}catch(e){}throw new Error(m)}
@@ -142,7 +160,8 @@ async function load(){
   if(!tokOk()){expired();return}
   try{
     const d=await api("/values/Vnosi!A2:I?valueRenderOption=UNFORMATTED_VALUE");
-    rows=(d.values||[]).map((r,i)=>{const by=String(r[5]||""),rf=r[1]==="povračilo";return {n:i+2,date:String(r[0]||""),t:rf?"odhodek":r[1],cat:String(r[2]||""),amt:rf?-(+r[3]||0):(+r[3]||0),rf,note:r[4]||"",by,acc:al(String(r[6]||""),by),acc2:al(String(r[8]||""),by)}}).filter(x=>x.t);
+    const vals=d.values||[];try{LS.vals=JSON.stringify(vals)}catch(e){}
+    rows=mapRows(vals);stale=false;
     err();render();
   }catch(e){if(e.message!=="auth")err("Napaka: "+e.message)}
 }
@@ -176,13 +195,13 @@ async function unlock(){
   try{await verify();rv=true;clearTimeout(rvT);rvT=setTimeout(()=>{rv=false;render()},120000);err();render();return true}
   catch(e){err(e.name==="NotAllowedError"?"Potrditev je bila preklicana ali ni uspela.":(e.message||"Potrditev ni uspela."));return false}
 }
-async function appUnlock(auto){
+async function appUnlock(){
   if(lbusy)return;lbusy=true;$("#lerr").textContent="";
   try{
-    if(cfg()&&!tokOk()){if(auto)throw Object.assign(new Error(""),{name:"NotAllowedError"});await newToken()}
-    await verify();$("#lock").hidden=true;
+    if(cfg()&&!tokOk())await newToken();
+    $("#lock").hidden=true;
     if(tokOk()&&sid){if($("#view").hidden)start();else load()}
-  }catch(e){$("#lerr").textContent=e.name==="NotAllowedError"?"Tapni »Odkleni« in potrdi s prstnim odtisom ali zaklepom zaslona.":(e.message||"Potrditev ni uspela.");$("#lcont").hidden=e.code!=="nosup"}
+  }catch(e){$("#lerr").textContent=e.message||"Prijava ni uspela."}
   lbusy=false;
 }
 let mh=0;
@@ -289,7 +308,7 @@ ${Object.entries(e).sort((a,b)=>b[1]-a[1]).map(([c,v])=>`<div class="r" data-ov=
 function people(){const c={};rows.forEach(x=>{if(x.by&&x.by!=="Uvoz")c[x.by]=(c[x.by]||0)+1});if(who&&!c[who])c[who]=0;return Object.keys(c).sort((a,b)=>a===who?-1:b===who?1:c[b]-c[a])}
 const V={acc:vAcc,cat:vCat,tx:vTx,ov:vOv};
 function render(){
-  if(!tok||$("#view").hidden)return;derive();R=rng();
+  if(!(tok||stale)||$("#view").hidden)return;derive();R=rng();
   $("#mon").textContent=R.lab;$("#mnav").hidden=tab==="acc";$("#ttl").hidden=tab!=="acc";$("#prev").hidden=$("#next").hidden=pr.k==="7"||pr.k==="c";
   const PP=people();$("#pf").hidden=tab==="acc"||PP.length<2;$("#pf").innerHTML=["",...PP].map(p=>`<button type="button" data-f="${esc(p)}" class="${pf===p?"on":""}">${p?esc(p):"Vsi"}</button>`).join("");
   $("#fab").hidden=tab==="acc";$("#eye").hidden=tab!=="acc";$("#eye").classList.toggle("on",rv);
@@ -304,7 +323,8 @@ function setT(t){
   $("#cat").hidden=t==="prenos";$("#acc2").hidden=t!=="prenos";$("#acc").placeholder=t==="prenos"?"Iz računa":t==="povračilo"?"Račun, kamor je prišlo":"Račun";$("#cat").placeholder=t==="povračilo"?"Kategorija stroška":"Kategorija";$("#acc2").placeholder="Na račun ali kredit";lists();
 }
 function showSetup(){$("#setup").hidden=false;$("#view").hidden=true;$("#nav").hidden=true;$("#fab").hidden=true;$("#eye").hidden=true;$("#mnav").hidden=true;$("#pf").hidden=true;$("#ttl").hidden=false;$("#cid").value=cid;$("#sh").value=sid;$("#imp").hidden=!tok;$("#ipn").value=who;$("#back").hidden=!tok;$("#logout").hidden=!tok;clearInterval(timer)}
-function start(){$("#setup").hidden=true;$("#view").hidden=false;$("#nav").hidden=false;err();load();clearInterval(timer);timer=setInterval(load,30000)}
+function showApp(){$("#setup").hidden=true;$("#view").hidden=false;$("#nav").hidden=false}
+function start(){showApp();err();load();clearInterval(timer);timer=setInterval(load,30000)}
 function parseCSV(t,d=","){const r=[];let row=[],f="",q=false;for(let i=0;i<t.length;i++){const c=t[i];if(q){if(c=='"'){if(t[i+1]=='"'){f+='"';i++}else q=false}else f+=c}else if(c=='"')q=true;else if(c==d){row.push(f);f=""}else if(c=="\n"||c=="\r"){if(c=="\r"&&t[i+1]=="\n")i++;row.push(f);r.push(row);row=[];f=""}else f+=c}if(f||row.length){row.push(f);r.push(row)}return r}
 
 $("#login").onclick=()=>{
@@ -321,7 +341,7 @@ async function onTok(r){
   catch(e){if(e.message!=="auth")err("Napaka: "+e.message)}
 }
 $("#pf").onclick=e=>{const b=e.target.closest("[data-f]");if(!b)return;pf=b.dataset.f;LS.pf=pf;render()};
-$("#logout").onclick=()=>{try{if(tok&&window.google)google.accounts.oauth2.revoke(tok,()=>{})}catch(e){}tok=null;["tok","exp","sub"].forEach(k=>LS.removeItem(k));LS.out="1";rows=[];clearInterval(timer);$("#lock").hidden=true;showSetup();err("Odjavljen/a. Za ponovno prijavo tapni »Prijava z Google«.")};
+$("#logout").onclick=()=>{try{if(tok&&window.google)google.accounts.oauth2.revoke(tok,()=>{})}catch(e){}tok=null;["tok","exp","sub","vals"].forEach(k=>LS.removeItem(k));LS.out="1";rows=[];stale=false;clearInterval(timer);$("#lock").hidden=true;showSetup();err("Odjavljen/a. Za ponovno prijavo tapni »Prijava z Google«.")};
 $("#cog").onclick=showSetup;$("#back").onclick=start;$("#rstfp").onclick=()=>{LS.removeItem("cred");err("Prstni odtis ponastavljen. Ob naslednjem odklepu ga nastaviš znova.")};
 $("#mon").onclick=openPeriod;
 $("#prev").onclick=()=>{pr.off=(pr.off||0)-1;savePr();render()};
@@ -373,13 +393,13 @@ $("#file").onchange=async e=>{
     await load();$("#ip").textContent="Uvoz končan: "+R.length+" vnosov.";err();
   }catch(x){if(x.message!=="auth")err("Uvoz ni uspel: "+x.message)}
 };
-$("#lbtn").onclick=()=>appUnlock(false);$("#lcont").onclick=()=>{$("#lock").hidden=true;if(tokOk()&&sid&&$("#view").hidden)start()};
+$("#lbtn").onclick=appUnlock;
 document.addEventListener("visibilitychange",()=>{
   if(document.hidden){rv=false;hideT=Date.now()}
-  else{if(cfg()&&hideT&&Date.now()-hideT>30000&&$("#lock").hidden){$("#lock").hidden=false;appUnlock(true)}if(tok&&sid&&!$("#view").hidden)load()}
+  else{if(tok&&sid&&!$("#view").hidden)load()}
 });
 if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
-if(cfg()){if(tokOk())start();else tok=null;appUnlock(true)}else{$("#lock").hidden=true;showSetup()}
+if(cfg()){if(tokOk())start();else expired()}else showSetup();
 </script>
 </body>
 </html>
