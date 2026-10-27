@@ -58,8 +58,9 @@ nav button{flex:1;border:0;background:none;border-radius:14px;font-size:20px;lin
     <label class="mu">Povezava do Google Preglednice</label><input id="sh" placeholder="https://docs.google.com/spreadsheets/d/…" autocomplete="off">
     <button class="p" id="login" style="width:100%">Prijava z Google</button>
     <p class="mu" style="text-align:center;margin:12px 0 0"><a href="zasebnost.html">Zasebnost / Privacy policy</a></p>
-    <div id="imp" hidden style="margin-top:18px"><strong>Uvoz</strong><p class="mu">Izberi, čigavi so vnosi, in CSV datoteko z izpiskom.</p><select id="ipn"><option>Rok</option><option>Katja</option></select><input type="file" id="file" accept=".csv,text/csv"><div id="ip" class="mu"></div>
+    <div id="imp" hidden style="margin-top:18px"><strong>Uvoz</strong><p class="mu">Izberi, čigavi so vnosi, in CSV datoteko z izpiskom.</p><select id="ipn"></select><input id="ipn2" placeholder="Ime osebe" hidden><input type="file" id="file" accept=".csv,text/csv"><div id="ip" class="mu"></div>
     <button id="rstfp" style="width:100%;margin-top:14px">Ponastavi prstni odtis</button></div>
+    <button id="defs" hidden style="width:100%;margin-top:10px">Računi, prihranki in krediti</button>
     <button id="back" hidden style="width:100%;margin-top:10px">Nazaj</button>
     <button id="logout" hidden style="width:100%;margin-top:10px">Odjava</button>
   </section>
@@ -92,9 +93,15 @@ const $=s=>$$(s)[0],$$=s=>document.querySelectorAll(s),LS=localStorage,enc=encod
 const SC="https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.profile";
 const MN=["januar","februar","marec","april","maj","junij","julij","avgust","september","oktober","november","december"],WD=["nedelja","ponedeljek","torek","sreda","četrtek","petek","sobota"];
 const PAL=["#4da3f5","#f5c518","#4caf50","#ef5b8a","#a56cd9","#ff9a3c","#26b5a5","#7a86e0","#e0654f","#8bc34a","#00acc1","#c2849b"],PC=["#4da3f5","#ef5b8a","#26b5a5","#ff9a3c"];
-const ACC=["Bančni račun Katja","Predplačniška Katja","Gotovina Katja","Bančni račun Rok","Predplačniška Rok","Gotovina Rok","Gotovina hidden place"];
-const SAV=["Triglav Investments","Etoro","Bitstamp","Pokojninski sklad Domel"];
-const LOANS=[{n:"Gorenjska Banka kredit",w:"Rok"},{n:"Intesa Ekosklad kredit Rok",w:"Rok"},{n:"Intesa Ekosklad kredit Katja",w:"Katja"},{n:"Meta kredit",w:""}],LN=LOANS.map(l=>l.n);
+let ACC=[],SAV=[],LOANS=[],LN=[];
+const TPL={"račun":[["Bančni račun Katja",""],["Predplačniška Katja",""],["Gotovina Katja",""],["Bančni račun Rok",""],["Predplačniška Rok",""],["Gotovina Rok",""],["Gotovina hidden place",""]],"prihranek":[["Triglav Investments",""],["Etoro",""],["Bitstamp",""],["Pokojninski sklad Domel",""]],"kredit":[["Gorenjska Banka kredit","Rok"],["Intesa Ekosklad kredit Rok","Rok"],["Intesa Ekosklad kredit Katja","Katja"],["Meta kredit",""]]};
+const hasDef=k=>rows.some(x=>x.t==="def"&&x.cat===k);
+function rebuild(){
+  const m={"račun":new Map(),"prihranek":new Map(),"kredit":new Map()};
+  rows.forEach(x=>{const k=m[x.cat];if(!k)return;if(x.t==="def")k.set(x.acc,String(x.note||""));else if(x.t==="def-")k.delete(x.acc)});
+  ACC=hasDef("račun")?[...m["račun"].keys()]:people().flatMap(p=>["Bančni račun","Predplačniška","Gotovina"].map(a=>a+" "+p));
+  SAV=[...m["prihranek"].keys()];LOANS=[...m["kredit"]].map(([n,w])=>({n,w}));LN=LOANS.map(l=>l.n);
+}
 const p2=n=>String(n).padStart(2,"0"),ym=d=>d.getFullYear()+"-"+p2(d.getMonth()+1),ymd=d=>ym(d)+"-"+p2(d.getDate()),today=()=>ymd(new Date());
 const sh=s=>`${+s.slice(8)}. ${+s.slice(5,7)}. ${s.slice(0,4)}`,db=(a,b)=>Math.round((new Date(b+"T12:00:00")-new Date(a+"T12:00:00"))/864e5),dAdd=(s,n)=>ymd(new Date(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8)+n));
 let tok=(LS.tok&&+LS.exp>Date.now())?LS.tok:null,sid=LS.sid||"",cid=LS.cid||"",who=LS.who||"",rows=[],bal={},R={a:"",b:"",lab:""},timer,rv=false,rvT,selCat="",ftype="odhodek";
@@ -108,7 +115,7 @@ const aic=n=>/banč/i.test(n)?"🏦":/predpl/i.test(n)?"💳":/gotov/i.test(n)?"
 const inR=x=>x.date>=R.a&&x.date<=R.b,mr=()=>rows.filter(x=>inR(x)&&(!pf||x.by===pf)),pick=(L,t)=>L.filter(x=>x.t===t);
 const cs=t=>{const o={};pick(mr(),t).forEach(x=>o[x.cat]=(o[x.cat]||0)+x.amt);return o};
 const cats=t=>[...new Set(pick(rows,t).map(x=>x.cat))],lastV=n=>{const v=rows.filter(x=>x.t==="vrednost"&&x.acc===n).sort(cmp);return v.length?v[v.length-1].amt:0};
-const pn=by=>/rok/i.test(by)?"Rok":"Katja",al=(a,by)=>a==="Kartice"?"Bančni račun "+pn(by):a==="Gotovina"?"Gotovina "+pn(by):a;
+const pn=by=>(!by||by==="Uvoz")?(who||"Jaz"):by,al=(a,by)=>a==="Kartice"?"Bančni račun "+pn(by):a==="Gotovina"?"Gotovina "+pn(by):a;
 const savePr=()=>LS.pr=JSON.stringify(pr);
 const cfg=()=>sid&&who&&!LS.out,tokOk=()=>tok&&+LS.exp>Date.now(),setTok=r=>{tok=r.access_token;LS.tok=tok;LS.exp=Date.now()+(r.expires_in-60)*1000};
 let stale=false,armed=false;
@@ -167,7 +174,7 @@ async function load(){
 }
 const addMany=async L=>{await api("/values/Vnosi!A:I:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS",{method:"POST",body:JSON.stringify({values:L})});await load()},add=v=>addMany([v]);
 function derive(){
-  bal={};const ad=(a,v)=>{if(a)bal[a]=(bal[a]||0)+v};
+  rebuild();bal={};const ad=(a,v)=>{if(a)bal[a]=(bal[a]||0)+v};
   rows.forEach(x=>{if(x.t==="odhodek")ad(x.acc,-x.amt);else if(x.t==="prihodek"||x.t==="začetno")ad(x.acc,x.amt);else if(x.t==="prenos"){ad(x.acc,-x.amt);ad(x.acc2,x.amt)}});
 }
 function loanCalc(l){
@@ -231,6 +238,23 @@ function editLoans(){
   openVM("Prilagodi kredite",L.map((l,i)=>`<b class="w">${esc(l.n)}</b><label class="mu">Preostali dolg (€)<input name="b${i}" type="number" step="0.01" inputmode="decimal" value="${l.bal==null?"":l.bal.toFixed(2)}"></label><label class="mu">Mesečna rata (€)<input name="r${i}" type="number" step="0.01" inputmode="decimal" value="${l.rata||""}"></label>`).join(""),
     async f=>{const out=[];L.forEach((l,i)=>{const b=parseFloat(f.get("b"+i)),r=parseFloat(f.get("r"+i))||0;if(isNaN(b))return;if(l.bal==null||Math.abs(b-l.bal)>=.005||r!==l.rata)out.push([today(),"kredit","",b,r,who,l.n,"",""])});if(out.length)await addMany(out)});
 }
+async function matDefs(k){
+  if(hasDef(k))return;const cur=k==="račun"?ACC.map(n=>[n,""]):k==="prihranek"?SAV.map(n=>[n,""]):LOANS.map(l=>[l.n,l.w]);
+  if(cur.length)await addMany(cur.map(([n,w])=>[today(),"def",k,0,w,who,n,"",""]));
+}
+function editDefs(){
+  derive();const P=people();
+  const sec=(k,t,L)=>`<b class="w" style="margin-top:8px">${t}</b>${L.map(([n,w])=>`<div class="w sp"><span>${esc(n)}${w?` <small>(plača: ${esc(w)})</small>`:""}</span><button type="button" class="ib" style="font-size:16px" data-dx="${k}|${enc(n)}" aria-label="Odstrani">✕</button></div>`).join("")}<input name="n_${k}" placeholder="Novo ime" autocomplete="off">${k==="kredit"?`<select name="w_kredit"><option value="">odbitek: ročno</option>${P.map(p=>`<option>${esc(p)}</option>`).join("")}</select>`:"<span></span>"}<button type="button" class="w" data-da="${k}">+ Dodaj</button>`;
+  const tpl=!hasDef("račun")&&!hasDef("prihranek")&&!hasDef("kredit")?`<button type="button" class="w" data-tpl="1">Naloži predlogo Rok &amp; Katja</button><small class="w">Imena računov so privzeto narejena iz imen prijavljenih oseb. Predloga doda tudi prihranke in kredite iz tega gospodinjstva.</small>`:"";
+  openVM("Računi, prihranki, krediti",tpl+sec("račun","Računi",ACC.map(n=>[n,""]))+sec("prihranek","Prihranki in investicije",SAV.map(n=>[n,""]))+sec("kredit","Krediti",LOANS.map(l=>[l.n,l.w])),async()=>{},async ev=>{
+    const t=ev.target,dx=t.closest("[data-dx]"),da=t.closest("[data-da]"),tp=t.closest("[data-tpl]");
+    try{
+      if(tp){await addMany(Object.entries(TPL).flatMap(([k,L])=>L.map(([n,w])=>[today(),"def",k,0,w,who,n,"",""])));editDefs()}
+      else if(dx){const [k,n]=dx.dataset.dx.split("|");await matDefs(k);await addMany([[today(),"def-",k,0,"",who,dec(n),"",""]]);editDefs()}
+      else if(da){const k=da.dataset.da,nm=($("#vf").elements["n_"+k].value||"").trim();if(!nm)return;const w=k==="kredit"?$("#vf").elements["w_kredit"].value:"";await matDefs(k);await addMany([[today(),"def",k,0,w,who,nm,"",""]]);editDefs()}
+    }catch(x){if(x.message!=="auth")err("Napaka: "+x.message)}
+  },"Zapri");
+}
 function editTx(n){
   const x=rows.find(r=>r.n===n);if(!x)return;
   const vr=x.rf?"povračilo":x.t,amt=x.rf?-x.amt:x.amt;ftype=vr==="prenos"?"prenos":vr==="povračilo"?"odhodek":vr;lists();
@@ -254,7 +278,7 @@ ${sim.length?`<label class="w"><input type="checkbox" name="all"> Kategorijo upo
 }
 function openAdd(o={}){
   mOpen("#sheet");$("#date").value=today();$("#amt").value="";$("#note").value="";$("#acc2").value="";
-  $("#acc").value=LS.acc||ACC.find(a=>a.toLowerCase().endsWith(" "+(who||"?").toLowerCase()))||ACC[0];setT(o.t||"odhodek");$("#cat").value=o.cat||"";
+  $("#acc").value=LS.acc||ACC.find(a=>a.toLowerCase().endsWith(" "+(who||"?").toLowerCase()))||ACC[0]||"";setT(o.t||"odhodek");$("#cat").value=o.cat||"";
 }
 function rowH(x,dl){
   const tr=x.t==="prenos",c=(x.t==="prihodek"||x.rf)?"in":tr?"mu":"ex";
@@ -312,8 +336,8 @@ function chartSav(){
   const ds=[...new Set(V.map(x=>x.date))],cur={},pts=ds.map(d=>{V.filter(x=>x.date===d).forEach(x=>cur[x.acc]=x.amt);return {d,v:{...cur},t:Object.values(cur).reduce((a,b)=>a+b,0)}});
   const T=d=>new Date(d+"T12:00:00").getTime(),t0=T(ds[0]),sp=Math.max(1,Math.max(Date.now(),T(ds[ds.length-1]))-t0),mx=Math.max(1,...pts.map(p=>p.t)),X=d=>10+(T(d)-t0)/sp*280,Y=v=>108-v/mx*95;
   const line=(f,c,w)=>{const a=pts.filter(p=>f(p)!=null).map(p=>[X(p.d),Y(f(p))]);if(!a.length)return"";a.push([290,a[a.length-1][1]]);return `<polyline points="${a.map(q=>q.join(",")).join(" ")}" fill="none" stroke="${c}" stroke-width="${w}"/>`};
-  return `<svg viewBox="0 0 300 125" class="ch">${SAV.map((n,i)=>line(p=>p.v[n],PC[i],1.2)).join("")}${line(p=>p.t,"var(--tx)",2.2)}<text x="10" y="121">${sh(ds[0])}</text><text x="290" y="121" text-anchor="end">danes</text><text x="298" y="9" text-anchor="end">${mk(mx)}</text></svg>
-<div style="display:flex;flex-wrap:wrap;gap:4px 12px"><small><b>━</b> skupaj ${mk(sum(SAV.map(n=>({amt:lastV(n)}))))}</small>${SAV.map((n,i)=>`<small><b style="color:${PC[i]}">■</b> ${esc(n)} ${mk(lastV(n))}</small>`).join("")}</div>${rv?"":'<small>Zneski so skriti. Odkleni jih v zavihku Računi (👁).</small>'}`;
+  return `<svg viewBox="0 0 300 125" class="ch">${SAV.map((n,i)=>line(p=>p.v[n],PC[i%4],1.2)).join("")}${line(p=>p.t,"var(--tx)",2.2)}<text x="10" y="121">${sh(ds[0])}</text><text x="290" y="121" text-anchor="end">danes</text><text x="298" y="9" text-anchor="end">${mk(mx)}</text></svg>
+<div style="display:flex;flex-wrap:wrap;gap:4px 12px"><small><b>━</b> skupaj ${mk(sum(SAV.map(n=>({amt:lastV(n)}))))}</small>${SAV.map((n,i)=>`<small><b style="color:${PC[i%4]}">■</b> ${esc(n)} ${mk(lastV(n))}</small>`).join("")}</div>${rv?"":'<small>Zneski so skriti. Odkleni jih v zavihku Računi (👁).</small>'}`;
 }
 function vOv(){
   const m=mr(),ex=sum(pick(m,"odhodek")),inc=sum(pick(m,"prihodek")),e=cs("odhodek"),tp=Math.max(1,sum(Object.values(e).filter(v=>v>0).map(v=>({amt:v})))),n=db(R.a,R.b)+1,td=today(),dn=Math.max(1,Math.min(n,td<R.a?0:db(R.a,td)+1));
@@ -343,7 +367,7 @@ function setT(t){
   ftype=t;$$("#seg button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));
   $("#cat").hidden=t==="prenos";$("#acc2").hidden=t!=="prenos";$("#acc").placeholder=t==="prenos"?"Iz računa":t==="povračilo"?"Račun, kamor je prišlo":"Račun";$("#cat").placeholder=t==="povračilo"?"Kategorija stroška":"Kategorija";$("#acc2").placeholder="Na račun ali kredit";lists();
 }
-function showSetup(){$("#setup").hidden=false;$("#view").hidden=true;$("#nav").hidden=true;$("#fab").hidden=true;$("#eye").hidden=true;$("#mnav").hidden=true;$("#pf").hidden=true;$("#ttl").hidden=false;$("#cid").value=cid;$("#sh").value=sid;$("#imp").hidden=!tok;{const o=[...$("#ipn").options].find(o=>o.value.toLowerCase()===(who||"").toLowerCase());$("#ipn").value=o?o.value:"Rok"}$("#back").hidden=!tok;$("#logout").hidden=!tok;clearInterval(timer)}
+function showSetup(){$("#setup").hidden=false;$("#view").hidden=true;$("#nav").hidden=true;$("#fab").hidden=true;$("#eye").hidden=true;$("#mnav").hidden=true;$("#pf").hidden=true;$("#ttl").hidden=false;$("#cid").value=cid;$("#sh").value=sid;$("#imp").hidden=!tok;$("#ipn").innerHTML=[...new Set([who,...people()].filter(Boolean))].map(n=>`<option>${esc(n)}</option>`).join("")+'<option value="__n">Druga oseba…</option>';$("#ipn2").hidden=$("#ipn").value!=="__n";$("#defs").hidden=!tok;$("#back").hidden=!tok;$("#logout").hidden=!tok;clearInterval(timer)}
 function showApp(){$("#setup").hidden=true;$("#view").hidden=false;$("#nav").hidden=false}
 function start(){showApp();err();load();clearInterval(timer);timer=setInterval(load,30000)}
 function parseCSV(t,d=","){const r=[];let row=[],f="",q=false;for(let i=0;i<t.length;i++){const c=t[i];if(q){if(c=='"'){if(t[i+1]=='"'){f+='"';i++}else q=false}else f+=c}else if(c=='"')q=true;else if(c==d){row.push(f);f=""}else if(c=="\n"||c=="\r"){if(c=="\r"&&t[i+1]=="\n")i++;row.push(f);r.push(row);row=[];f=""}else f+=c}if(f||row.length){row.push(f);r.push(row)}return r}
@@ -363,6 +387,7 @@ async function onTok(r){
 }
 $("#pf").onclick=e=>{const b=e.target.closest("[data-f]");if(!b)return;pf=b.dataset.f;LS.pf=pf;render()};
 $("#logout").onclick=()=>{try{if(tok&&window.google)google.accounts.oauth2.revoke(tok,()=>{})}catch(e){}tok=null;["tok","exp","sub","vals"].forEach(k=>LS.removeItem(k));LS.out="1";rows=[];stale=false;clearInterval(timer);$("#lock").hidden=true;showSetup();err("Odjavljen/a. Za ponovno prijavo tapni »Prijava z Google«.")};
+$("#ipn").onchange=()=>$("#ipn2").hidden=$("#ipn").value!=="__n";$("#defs").onclick=editDefs;
 $("#cog").onclick=showSetup;$("#back").onclick=start;$("#rstfp").onclick=()=>{LS.removeItem("cred");err("Prstni odtis ponastavljen. Ob naslednjem odklepu ga nastaviš znova.")};
 $("#mon").onclick=openPeriod;
 $("#prev").onclick=()=>{pr.off=(pr.off||0)-1;savePr();render()};
@@ -398,7 +423,7 @@ $("#view").onclick=async e=>{
 };
 $("#view").onchange=e=>{if(e.target.dataset.sav!==undefined){LS.sav=e.target.checked?"1":"";render()}};
 $("#file").onchange=async e=>{
-  const f=e.target.files[0],nm=$("#ipn").value.trim();if(!f)return;
+  const f=e.target.files[0],nm=($("#ipn").value==="__n"?$("#ipn2").value:$("#ipn").value).trim();if(!f)return;
   if(!nm){e.target.value="";return err("Vpiši, čigavi so uvoženi vnosi.")}
   let txt="";try{txt=(await f.text()).replace(/^\uFEFF/,"")}catch(x){e.target.value="";return err("Datoteke ni mogoče prebrati: "+x.message)}
   e.target.value="";const h=txt.split("\n")[0],d=(h.match(/;/g)||[]).length>(h.match(/,/g)||[]).length?";":",";
