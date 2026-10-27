@@ -39,7 +39,7 @@ nav button{flex:1;border:0;background:none;border-radius:14px;font-size:20px;lin
 .modal{position:fixed;inset:0;background:#0008;z-index:9;display:flex}.modal>form{background:var(--bg);width:100%;max-width:720px;margin:auto auto 0;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:92vh;overflow:auto}
 .modal .w{grid-column:1/-1}.modal input:not([type=checkbox]),.modal select{width:100%}.modal label{display:block}.modal button.on{background:var(--ac);color:var(--on);border-color:var(--ac)}
 #seg button{padding:9px 2px;font-size:14px}.seg{display:flex;gap:6px}.seg button{flex:1}.seg .on{background:var(--ac);color:var(--on);border-color:var(--ac)}
-.setup input{width:100%;margin:4px 0 10px}#err{color:var(--ex);font-size:14px;margin-bottom:8px}
+.setup input,.setup select{width:100%;margin:4px 0 10px}#err{color:var(--ex);font-size:14px;margin-bottom:8px}
 </style>
 </head>
 <body>
@@ -58,7 +58,7 @@ nav button{flex:1;border:0;background:none;border-radius:14px;font-size:20px;lin
     <label class="mu">Povezava do Google Preglednice</label><input id="sh" placeholder="https://docs.google.com/spreadsheets/d/…" autocomplete="off">
     <button class="p" id="login" style="width:100%">Prijava z Google</button>
     <p class="mu" style="text-align:center;margin:12px 0 0"><a href="zasebnost.html">Zasebnost / Privacy policy</a></p>
-    <div id="imp" hidden style="margin-top:18px"><strong>Uvoz iz 1Money</strong><p class="mu">Izberi datoteko uvoz-1money.csv (enkrat samo na enem telefonu).</p><input id="ipn" placeholder="Čigavi so ti vnosi? (npr. Katja)"><input type="file" id="file" accept=".csv,text/csv"><div id="ip" class="mu"></div>
+    <div id="imp" hidden style="margin-top:18px"><strong>Uvoz</strong><p class="mu">Izberi, čigavi so vnosi, in CSV datoteko z izpiskom.</p><select id="ipn"><option>Rok</option><option>Katja</option></select><input type="file" id="file" accept=".csv,text/csv"><div id="ip" class="mu"></div>
     <button id="rstfp" style="width:100%;margin-top:14px">Ponastavi prstni odtis</button></div>
     <button id="back" hidden style="width:100%;margin-top:10px">Nazaj</button>
     <button id="logout" hidden style="width:100%;margin-top:10px">Odjava</button>
@@ -343,7 +343,7 @@ function setT(t){
   ftype=t;$$("#seg button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));
   $("#cat").hidden=t==="prenos";$("#acc2").hidden=t!=="prenos";$("#acc").placeholder=t==="prenos"?"Iz računa":t==="povračilo"?"Račun, kamor je prišlo":"Račun";$("#cat").placeholder=t==="povračilo"?"Kategorija stroška":"Kategorija";$("#acc2").placeholder="Na račun ali kredit";lists();
 }
-function showSetup(){$("#setup").hidden=false;$("#view").hidden=true;$("#nav").hidden=true;$("#fab").hidden=true;$("#eye").hidden=true;$("#mnav").hidden=true;$("#pf").hidden=true;$("#ttl").hidden=false;$("#cid").value=cid;$("#sh").value=sid;$("#imp").hidden=!tok;$("#ipn").value=who;$("#back").hidden=!tok;$("#logout").hidden=!tok;clearInterval(timer)}
+function showSetup(){$("#setup").hidden=false;$("#view").hidden=true;$("#nav").hidden=true;$("#fab").hidden=true;$("#eye").hidden=true;$("#mnav").hidden=true;$("#pf").hidden=true;$("#ttl").hidden=false;$("#cid").value=cid;$("#sh").value=sid;$("#imp").hidden=!tok;{const o=[...$("#ipn").options].find(o=>o.value.toLowerCase()===(who||"").toLowerCase());$("#ipn").value=o?o.value:"Rok"}$("#back").hidden=!tok;$("#logout").hidden=!tok;clearInterval(timer)}
 function showApp(){$("#setup").hidden=true;$("#view").hidden=false;$("#nav").hidden=false}
 function start(){showApp();err();load();clearInterval(timer);timer=setInterval(load,30000)}
 function parseCSV(t,d=","){const r=[];let row=[],f="",q=false;for(let i=0;i<t.length;i++){const c=t[i];if(q){if(c=='"'){if(t[i+1]=='"'){f+='"';i++}else q=false}else f+=c}else if(c=='"')q=true;else if(c==d){row.push(f);f=""}else if(c=="\n"||c=="\r"){if(c=="\r"&&t[i+1]=="\n")i++;row.push(f);r.push(row);row=[];f=""}else f+=c}if(f||row.length){row.push(f);r.push(row)}return r}
