@@ -430,11 +430,11 @@ $("#file").onchange=async e=>{
   const R=parseCSV(txt,d).filter(r=>r.length>=7);
   if(!R.length||String(R[0][0]).trim().toLowerCase()!=="datum")return err("Datoteka nima pričakovane oblike. Prebrano ("+f.name+", "+txt.length+" znakov): "+JSON.stringify(txt.slice(0,40)));
   R.shift();R.forEach(r=>{while(r.length<9)r.push("");r[3]=+r[3]});
-  const ex=new Map(),kx=(d,v,a,r,o)=>[d,v,Math.abs(a),r,o].join("|");
+  const ex=new Map(),kx=(d,v,a,r)=>[d,v,Math.abs(a),r].join("|");
   rows.forEach(x=>{const k=kx(x.date,x.rf?"povračilo":x.t,x.amt,x.acc,x.note);ex.set(k,(ex.get(k)||0)+1)});
   const N=R.filter(r=>{const k=kx(r[0],r[1],r[3],al(String(r[6]),nm),r[4]),c=ex.get(k)||0;if(c>0){ex.set(k,c-1);return false}return true});
   if(!N.length)return err("Vseh "+R.length+" vnosov že obstaja. Nič ni bilo uvoženo.");
-  if(!confirm("Uvozim "+N.length+" novih vnosov"+(R.length>N.length?" ("+(R.length-N.length)+" jih že obstaja)":"")+" za osebo "+nm+"?"))return;
+  if(!confirm("Uvozim "+N.length+" novih vnosov"+(R.length>N.length?" ("+(R.length-N.length)+" jih že obstaja ali je vnesenih ročno: isti datum, znesek, račun)":"")+" za osebo "+nm+"?"))return;
   try{
     for(let i=0;i<N.length;i+=400){
       const ch=N.slice(i,i+400).map(r=>{r[5]=nm;return r.slice(0,9)});
