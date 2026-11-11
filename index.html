@@ -267,12 +267,12 @@ function editTx(n){
 <label class="mu">Na račun (prenos)<input name="r2" list="da" value="${esc(x.acc2)}" autocomplete="off"></label>
 <label class="mu">Datum<input name="d" type="date" value="${esc(x.date)}" required></label>
 <label class="mu">Opomba<input name="o" value="${esc(x.note)}" maxlength="120"></label>
-${sim.length?`<label class="w"><input type="checkbox" name="all"> Kategorijo uporabi tudi za ${sim.length} podobnih vnosov</label>`:""}`,
+${sim.length?`<label class="w"><input type="checkbox" name="all"> Vrsto, kategorijo in »Na račun« uporabi tudi za ${sim.length} podobnih vnosov</label>`:""}`,
   async f=>{
     const v=f.get("v"),c=f.get("c").trim(),a=parseFloat(f.get("a")),acc=f.get("r").trim(),acc2=f.get("r2").trim();
     if(!(a>=0)||!acc||(v==="prenos"?!acc2:!c))throw new Error("Izpolni kategorijo (pri prenosu »Na račun«) in račun.");
     await api("/values/Vnosi!A"+n+":I"+n+"?valueInputOption=RAW",{method:"PUT",body:JSON.stringify({values:[[f.get("d"),v,v==="prenos"?"":c,a,f.get("o").trim(),x.by,acc,"",v==="prenos"?acc2:""]]})});
-    if(f.get("all")&&v!=="prenos"&&sim.length)await api("/values:batchUpdate",{method:"POST",body:JSON.stringify({valueInputOption:"RAW",data:sim.map(y=>({range:"Vnosi!C"+y.n,values:[[c]]}))})});
+    if(f.get("all")&&sim.length)await api("/values:batchUpdate",{method:"POST",body:JSON.stringify({valueInputOption:"RAW",data:sim.flatMap(y=>[{range:"Vnosi!B"+y.n+":C"+y.n,values:[[v,v==="prenos"?"":c]]},{range:"Vnosi!I"+y.n,values:[[v==="prenos"?acc2:""]]}])})});
     await load();
   });
 }
